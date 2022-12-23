@@ -29,7 +29,7 @@ interface CompactSet<T> {
 }
 
 @PublishedApi
-internal val generatorMap = mutableMapOf<KClass<*>, SpecializedCompactSetGenerator>(
+internal val generatorMap = mapOf<KClass<*>, SpecializedCompactSetGenerator>(
     Int::class to SpecializedCompactSetGenerator(
         className = "IntCompactSetImpl",
         primitiveSettings = IntInstructionSettings
