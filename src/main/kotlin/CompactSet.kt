@@ -57,8 +57,9 @@ inline fun <reified T> newCompactSet(expectedSize: Int = 16): CompactSet<T> {
             val generatedClass = generator.generateClass()
             compactSetClassLoader.defineClass("com.example.compactset.${generator.className}", generatedClass)
         }
-        println(loadedClass.getDeclaredConstructor(Int::class.java))
-        DefaultCompactSetImpl(expectedSize)
+        val constructor = loadedClass.getConstructor(Int::class.java)
+        @Suppress("UNCHECKED_CAST")
+        return constructor.newInstance(expectedSize) as CompactSet<T>
     } else {
         DefaultCompactSetImpl(expectedSize)
     }
