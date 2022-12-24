@@ -1,7 +1,7 @@
 # CompactSet
 
-A small Kotlin library implementing a set data structure called `CompactSet` that automatically specializes to primitive types
-by dynamically generating bytecode for certain primitive types.
+A small Kotlin library implementing a set data structure called `CompactSet` that automatically specializes to certain
+primitive types by dynamically generating specialized bytecode.
 
 On the JVM, generics are usually implemented using type erasure and essentially using `Object` anywhere rather than
 a specific type. For primitives, this will require [boxing](https://docs.oracle.com/javase/tutorial/java/data/autoboxing.html)
@@ -26,10 +26,10 @@ a default implementation that is not specialized for any other type.
     .
     ├──
     ├── src
-    │   ├── main                # main package
+    │   ├── main/kotlin         # main package including CompactSet interface
     │   │   ├── codegen         # classes used to generate specialized bytecode
     │   │   ├── impl            # implementations of the CompactSet interface
-    │   ├── test                # package containing unit tests
+    │   ├── test/kotlin         # package containing unit tests
     └── ...
 
 ## Building
