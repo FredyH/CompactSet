@@ -13,7 +13,7 @@ import java.util.concurrent.atomic.AtomicLong
  * The reason this is generic is that the tests for all the type arguments are exactly the same,
  * they are just different types of values that are stored.
  */
-abstract class GenericCompactSetImplTest<T> : WordSpec() {
+internal abstract class GenericCompactSetImplTest<T> : WordSpec() {
     abstract fun createSet(): CompactSet<T>
 
     abstract fun generateNextDistinctValue(): T
@@ -70,7 +70,7 @@ abstract class GenericCompactSetImplTest<T> : WordSpec() {
 
             "return the correct size after adding elements" {
                 val set = createSet()
-                for (i in 1..1000) {
+                for (i in 1..10000) {
                     val nextValue = generateNextDistinctValue()
 
                     set.add(nextValue)
@@ -103,7 +103,7 @@ abstract class GenericCompactSetImplTest<T> : WordSpec() {
     }
 }
 
-class DefaultCompactSetImplTest : GenericCompactSetImplTest<String?>() {
+internal class DefaultCompactSetImplTest : GenericCompactSetImplTest<String?>() {
     override fun createSet(): CompactSet<String?> = newCompactSet()
     override val defaultArrayValue: String? = null
 
@@ -111,8 +111,16 @@ class DefaultCompactSetImplTest : GenericCompactSetImplTest<String?>() {
     override fun generateNextDistinctValue(): String = counter.incrementAndGet().toString()
 }
 
+internal class BoxedCompactSetImplTest : GenericCompactSetImplTest<Double?>() {
+    override fun createSet(): CompactSet<Double?> = newCompactSet()
+    override val defaultArrayValue: Double? = null
 
-class IntCompactSetImplTest : GenericCompactSetImplTest<Int>() {
+    private val counter = AtomicInteger(0)
+    override fun generateNextDistinctValue(): Double = counter.incrementAndGet().toDouble()
+}
+
+
+internal class IntCompactSetImplTest : GenericCompactSetImplTest<Int>() {
     override fun createSet(): CompactSet<Int> = newCompactSet()
     override val defaultArrayValue: Int = 0
 
@@ -120,7 +128,7 @@ class IntCompactSetImplTest : GenericCompactSetImplTest<Int>() {
     override fun generateNextDistinctValue(): Int = counter.incrementAndGet()
 }
 
-class LongCompactSetImplTest : GenericCompactSetImplTest<Long>() {
+internal class LongCompactSetImplTest : GenericCompactSetImplTest<Long>() {
     override fun createSet(): CompactSet<Long> = newCompactSet()
     override val defaultArrayValue: Long = 0L
 
@@ -128,7 +136,7 @@ class LongCompactSetImplTest : GenericCompactSetImplTest<Long>() {
     override fun generateNextDistinctValue(): Long = counter.incrementAndGet()
 }
 
-class DoubleCompactSetImplTest : GenericCompactSetImplTest<Double>() {
+internal class DoubleCompactSetImplTest : GenericCompactSetImplTest<Double>() {
     override fun createSet(): CompactSet<Double> = newCompactSet()
     override val defaultArrayValue: Double = 0.0
 

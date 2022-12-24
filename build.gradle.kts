@@ -2,15 +2,10 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     kotlin("jvm") version "1.7.21"
-    application
 }
 
 group = "com.example"
-version = "1.0-SNAPSHOT"
-
-application {
-    mainClass.set("com.example.compactset.MainKt")
-}
+version = "1.0"
 
 repositories {
     mavenCentral()

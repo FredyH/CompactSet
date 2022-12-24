@@ -1,9 +1,11 @@
-package com.example.compactset
+package com.example.compactset.impl
+
+import com.example.compactset.CompactSet
 
 /**
  * The default implementation of [CompactSet] for non-primitive types.
  */
-class DefaultCompactSetImpl<T>(expectedSize: Int) : CompactSet<T> {
+internal class DefaultCompactSetImpl<T>(expectedSize: Int) : CompactSet<T> {
     private var backingArray = Array<Any?>(expectedSize) { null }
 
     override var size: Int = 0
@@ -11,7 +13,7 @@ class DefaultCompactSetImpl<T>(expectedSize: Int) : CompactSet<T> {
 
     override fun contains(value: T): Boolean {
         //It is important to limit ourselves to size here, since only size elements
-        //are actually in the set, while the rest of the value are null
+        //are actually in the set, while the rest of the value are "uninitialized" and null.
         for (i in 0 until size) {
             if (backingArray[i] == value) {
                 return true

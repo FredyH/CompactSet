@@ -1,36 +1,75 @@
-package com.example.compactset
+package com.example.compactset.codegen
 
 import org.objectweb.asm.Label
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
 
-abstract class PrimitiveTypeInstructionSettings(
+/**
+ * The JVM has different instructions depending on the type of element being worked on.
+ * Even worse, variables can take different amount of slots in the local variable section (and stack) of the JVM,
+ * depending on the size (Double, Long 2 slots, everything else 1 slot).
+ *
+ * This class defines the settings for a primitive type on the JVM, including the
+ * [specializedTypeName], the corresponding [boxedTypeName] and the [specializedTypeCode] used to create arrays
+ * as well as the [slotSize] a primitive value will take up in the local variables and stack.
+ *
+ * Further, subclasses of this class define how code for certain instructions is emitted.
+ */
+internal abstract class PrimitiveTypeInstructionSettings(
     val specializedTypeName: String,
     val boxedTypeName: String,
     val specializedTypeCode: Int,
     val slotSize: Int
 ) {
+    /**
+     * Loads the primitive defined by this class onto the JVM stack from the local variable in the [slot].
+     */
     abstract fun loadPrimitive(mv: MethodVisitor, slot: Int)
 
-    //Unbox primitive at top of stack
+    /**
+     * Unboxes the primitive defined by this class out of a boxed object at the top of the stack.
+     * Removes the boxed object and pushes the value of the primitive onto the stack.
+     */
     abstract fun unboxPrimitive(mv: MethodVisitor)
 
-    //Unbox primitive at top of stack
+    /**
+     * Stores the primitive defined by this class at the top of the JVM stack into the local variable at the [slot].
+     */
     abstract fun storePrimitive(mv: MethodVisitor, slot: Int)
 
-    //Unbox primitive at top of stack
+    /**
+     * Given the following stack layout (top to bottom)
+     *
+     * Primitive value to store
+     * Int Index to store at
+     * Reference to array
+     * ...
+     *
+     * consumes the top 3 elements of the stack and stores the primitive value defined by this class
+     * into the referenced array at the given index.
+     */
     abstract fun storeInArray(mv: MethodVisitor)
 
+    /**
+     * Given the following stack layout (top to bottom)
+     *
+     *  Int Index to load from
+     *  Reference to array
+     *  ...
+     *
+     *  consumes the top 2 elements of the stack and pushes the primitive value in the array at the given index
+     *  onto the stack.
+     */
     abstract fun loadArrayEntry(mv: MethodVisitor)
 
     /**
-     * Jumps to the [target] if the two variables on top of the stack are not equal.
+     * Jumps to the [target] if the two primitive values defined by this class on top of the stack are not equal.
      */
     abstract fun jumpNotEquals(mv: MethodVisitor, target: Label)
 }
 
 
-object IntInstructionSettings: PrimitiveTypeInstructionSettings(
+internal object IntInstructionSettings: PrimitiveTypeInstructionSettings(
     specializedTypeName = "I",
     specializedTypeCode = Opcodes.T_INT,
     boxedTypeName = "java/lang/Integer",
@@ -63,7 +102,7 @@ object IntInstructionSettings: PrimitiveTypeInstructionSettings(
 }
 
 
-object LongInstructionSettings: PrimitiveTypeInstructionSettings(
+internal object LongInstructionSettings: PrimitiveTypeInstructionSettings(
     specializedTypeName = "J",
     specializedTypeCode = Opcodes.T_LONG,
     boxedTypeName = "java/lang/Long",
@@ -97,7 +136,7 @@ object LongInstructionSettings: PrimitiveTypeInstructionSettings(
 }
 
 
-object DoubleInstructionSettings: PrimitiveTypeInstructionSettings(
+internal object DoubleInstructionSettings: PrimitiveTypeInstructionSettings(
     specializedTypeName = "D",
     specializedTypeCode = Opcodes.T_DOUBLE,
     boxedTypeName = "java/lang/Double",

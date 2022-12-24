@@ -1,16 +1,19 @@
 package com.example.compactset
 
+import com.example.compactset.codegen.DoubleInstructionSettings
+import com.example.compactset.codegen.IntInstructionSettings
+import com.example.compactset.codegen.LongInstructionSettings
+import com.example.compactset.codegen.SpecializedCompactSetGenerator
 import org.objectweb.asm.ClassReader
-import org.objectweb.asm.Opcodes
-import org.objectweb.asm.Type
 import org.objectweb.asm.util.TraceClassVisitor
 import java.io.File
 import java.io.PrintWriter
 import java.io.StringWriter
 
 
-//Just a file containing debug functions
-fun generateClass() {
+//Just a file containing debug functions to write the specialized classes to a file.
+//This allows us to look at the decompiled version in IntelliJ to verify that the code looks correctly.
+private fun generateClass() {
     val generators = listOf(
         SpecializedCompactSetGenerator(
             className = "IntCompactSetImpl",
