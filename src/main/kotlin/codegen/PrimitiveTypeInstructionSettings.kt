@@ -3,6 +3,7 @@ package com.example.compactset.codegen
 import org.objectweb.asm.Label
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
+import java.lang.reflect.Method
 
 /**
  * The JVM has different instructions depending on the type of element being worked on.
@@ -66,6 +67,21 @@ internal abstract class PrimitiveTypeInstructionSettings(
      * Jumps to the [target] if the two primitive values defined by this class on top of the stack are not equal.
      */
     abstract fun jumpNotEquals(mv: MethodVisitor, target: Label)
+
+    /**
+     * Jumps to the [target] if the two primitive values defined by this class on top of the stack are equal.
+     */
+    abstract fun jumpEquals(mv: MethodVisitor, target: Label)
+
+    /**
+     * Given a primitive value at the top of the stack, consumes that value and pushes its hash code.
+     */
+    abstract fun calculateHashCode(mv: MethodVisitor)
+
+    /**
+     * Load the zero value of this primitive
+     */
+    abstract fun loadZero(mv: MethodVisitor)
 }
 
 
@@ -92,8 +108,22 @@ internal object IntInstructionSettings: PrimitiveTypeInstructionSettings(
         mv.visitInsn(Opcodes.IALOAD)
     }
 
+    override fun jumpEquals(mv: MethodVisitor, target: Label) {
+        mv.visitJumpInsn(Opcodes.IF_ICMPEQ, target)
+    }
+
     override fun jumpNotEquals(mv: MethodVisitor, target: Label) {
         mv.visitJumpInsn(Opcodes.IF_ICMPNE, target)
+    }
+
+    override fun calculateHashCode(mv: MethodVisitor) {
+        //Technically, equivalent to a no-op
+        mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Integer", "hashCode", "(I)I", false)
+
+    }
+
+    override fun loadZero(mv: MethodVisitor) {
+        mv.visitInsn(Opcodes.ICONST_0)
     }
 
     override fun storeInArray(mv: MethodVisitor) {
@@ -125,13 +155,26 @@ internal object LongInstructionSettings: PrimitiveTypeInstructionSettings(
         mv.visitInsn(Opcodes.LALOAD)
     }
 
+    override fun jumpEquals(mv: MethodVisitor, target: Label) {
+        mv.visitInsn(Opcodes.LCMP)
+        mv.visitJumpInsn(Opcodes.IFEQ, target)
+    }
+
     override fun jumpNotEquals(mv: MethodVisitor, target: Label) {
         mv.visitInsn(Opcodes.LCMP)
         mv.visitJumpInsn(Opcodes.IFNE, target)
     }
 
+    override fun loadZero(mv: MethodVisitor) {
+        mv.visitInsn(Opcodes.LCONST_0)
+    }
+
     override fun storeInArray(mv: MethodVisitor) {
         mv.visitInsn(Opcodes.LASTORE)
+    }
+
+    override fun calculateHashCode(mv: MethodVisitor) {
+        mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Long", "hashCode", "(J)I", false)
     }
 }
 
@@ -159,6 +202,11 @@ internal object DoubleInstructionSettings: PrimitiveTypeInstructionSettings(
         mv.visitInsn(Opcodes.DALOAD)
     }
 
+    override fun jumpEquals(mv: MethodVisitor, target: Label) {
+        mv.visitInsn(Opcodes.DCMPG)
+        mv.visitJumpInsn(Opcodes.IFEQ, target)
+    }
+
     override fun jumpNotEquals(mv: MethodVisitor, target: Label) {
         mv.visitInsn(Opcodes.DCMPG)
         mv.visitJumpInsn(Opcodes.IFNE, target)
@@ -166,5 +214,13 @@ internal object DoubleInstructionSettings: PrimitiveTypeInstructionSettings(
 
     override fun storeInArray(mv: MethodVisitor) {
         mv.visitInsn(Opcodes.DASTORE)
+    }
+
+    override fun loadZero(mv: MethodVisitor) {
+        mv.visitInsn(Opcodes.DCONST_0)
+    }
+
+    override fun calculateHashCode(mv: MethodVisitor) {
+        mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Double", "hashCode", "(D)I", false)
     }
 }

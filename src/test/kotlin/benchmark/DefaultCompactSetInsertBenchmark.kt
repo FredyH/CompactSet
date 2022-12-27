@@ -10,18 +10,25 @@ import kotlin.random.Random
 @Warmup(iterations = 3)
 @Measurement(iterations = 3, time = 3, timeUnit = TimeUnit.SECONDS)
 open class DefaultCompactSetInsertBenchmark {
-    private lateinit var compactSet: CompactSet<String?>
-    private lateinit var hashSet: HashSet<String?>
+    private lateinit var compactSet: CompactSet<Int?>
+    private lateinit var specializedCompactSet: CompactSet<Int>
+    private lateinit var hashSet: HashSet<Int>
 
-    private lateinit var valueArray: Array<String>
+    private lateinit var valueArray: Array<Int>
 
     @Setup
     open fun setup() {
         compactSet = newCompactSet(16)
+        specializedCompactSet = newCompactSet(16)
         hashSet = HashSet(16)
-        valueArray = Array(1000) { Random.nextInt().toString() }
-        valueArray.forEach { compactSet.add("a$it") }
-        valueArray.forEach { hashSet.add("a$it") }
+        valueArray = Array(1000) { Random.nextInt() }
+    }
+
+    @Benchmark
+    open fun benchmarkSpecializedCompactSet() {
+        valueArray.forEach {
+            specializedCompactSet.add(it)
+        }
     }
 
     @Benchmark

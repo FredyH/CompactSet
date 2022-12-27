@@ -18,12 +18,12 @@ internal class DefaultCompactSetImpl<T>(initialSize: Int) : CompactSet<T> {
             return sizeWithoutNull / backingArray.size.toFloat()
         }
 
-    private fun hashIndex(element: Any, size: Int): Int {
+    private fun hashIndex(size: Int, element: Any): Int {
         return Math.floorMod(element.hashCode(), size)
     }
 
-    private fun getElementIndex(element: Any, array: Array<Any?>): Int {
-        var index = hashIndex(element, array.size)
+    private fun getElementIndex(array: Array<Any?>, element: Any): Int {
+        var index = hashIndex(array.size, element)
 
         var currentValue = array[index]
         while (currentValue != null) {
@@ -34,8 +34,8 @@ internal class DefaultCompactSetImpl<T>(initialSize: Int) : CompactSet<T> {
         return index
     }
 
-    private fun insertElement(element: Any, array: Array<Any?>): Boolean {
-        val index = getElementIndex(element, array)
+    private fun insertElement(array: Array<Any?>, element: Any): Boolean {
+        val index = getElementIndex(array, element)
         if (array[index] != null) return false
 
         array[index] = element
@@ -48,7 +48,7 @@ internal class DefaultCompactSetImpl<T>(initialSize: Int) : CompactSet<T> {
 
         for (a in backingArray) {
             if (a == null) continue
-            insertElement(a, newArray)
+            insertElement(newArray, a)
         }
 
         backingArray = newArray
@@ -57,7 +57,7 @@ internal class DefaultCompactSetImpl<T>(initialSize: Int) : CompactSet<T> {
     override fun contains(value: T): Boolean {
         if (value == null) return containsNull
 
-        val index = getElementIndex(value, backingArray)
+        val index = getElementIndex(backingArray, value)
         return backingArray[index] != null
     }
 
@@ -73,7 +73,7 @@ internal class DefaultCompactSetImpl<T>(initialSize: Int) : CompactSet<T> {
             rehash()
         }
 
-        if (!insertElement(element, backingArray)) return false
+        if (!insertElement(backingArray, element)) return false
         size++
 
         return true

@@ -5,8 +5,6 @@ import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.booleans.shouldBeTrue
 import io.kotest.matchers.ints.shouldBeZero
 import io.kotest.matchers.shouldBe
-import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.atomic.AtomicLong
 import kotlin.random.Random
 
 /**
@@ -102,6 +100,7 @@ internal abstract class GenericCompactSetImplTest<T> : WordSpec() {
                 val set = createSet()
                 val allAddedValues = mutableListOf<T>()
                 set.add(defaultArrayValue)
+                set.size.shouldBe(1)
                 for (i in 1..10000) {
                     val nextValue = getNextDistinctValue()
 
