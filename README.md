@@ -63,7 +63,7 @@ On a 32-bit JVM, a primitive integer is (typically) represented using 4 bytes, w
 Additional to the overhead per value, we also have to consider that primitive integers are stored as values in the
 backing array. The boxed objects are all allocated separately on the heap and only the references to the objects
 are stored (as values) in the array. Since on the 32 bit JVM, references are also (typically) 4 bytes, the overhead is
-comprised entirely by the size of the boxed values.
+consists entirely of the size of the boxed values.
 
 For $n$ boxed integers, this results in a memory overhead of $16 * n$ bytes.
 
