@@ -3,6 +3,7 @@ package com.example.compactset.benchmark
 import com.example.compactset.CompactSet
 import com.example.compactset.newCompactSet
 import org.openjdk.jmh.annotations.*
+import org.openjdk.jmh.infra.Blackhole
 import java.util.concurrent.TimeUnit
 import kotlin.random.Random
 
@@ -26,23 +27,23 @@ open class DefaultCompactSetCreationBenchmark {
     }
 
     @Benchmark
-    open fun benchmarkSpecializedCompactSet() {
+    open fun benchmarkSpecializedCompactSet(blackhole: Blackhole) {
         valueArray.forEach {
-            specializedCompactSet.add(it)
+            blackhole.consume(specializedCompactSet.add(it))
         }
     }
 
     @Benchmark
-    open fun benchmarkCompactSet() {
+    open fun benchmarkCompactSet(blackhole: Blackhole) {
         valueArray.forEach {
-            compactSet.add(it)
+            blackhole.consume(compactSet.add(it))
         }
     }
 
     @Benchmark
-    open fun benchmarkHashSet() {
+    open fun benchmarkHashSet(blackhole: Blackhole) {
         valueArray.forEach {
-            hashSet.add(it)
+            blackhole.consume(hashSet.add(it))
         }
     }
 }
