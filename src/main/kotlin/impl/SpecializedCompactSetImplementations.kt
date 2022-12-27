@@ -25,7 +25,7 @@ private val generatorMap = mapOf<KClass<*>, SpecializedCompactSetGenerator>(
 private val generatedClassMap = ConcurrentHashMap<SpecializedCompactSetGenerator, Class<*>>()
 
 @PublishedApi
-internal fun createCompactSet(expectedSize: Int, type: KType): CompactSet<Any?> {
+internal fun createCompactSet(initialSize: Int, type: KType): CompactSet<Any?> {
     val generator = generatorMap[type.classifier]
     //Important to check for nullable here. Primitives cannot be null, so they have to be stored
     //in boxed form to achieve nullability.
@@ -36,8 +36,8 @@ internal fun createCompactSet(expectedSize: Int, type: KType): CompactSet<Any?> 
         }
         val constructor = loadedClass.getConstructor(Int::class.java)
         @Suppress("UNCHECKED_CAST")
-        return constructor.newInstance(expectedSize) as CompactSet<Any?>
+        return constructor.newInstance(initialSize) as CompactSet<Any?>
     } else {
-        DefaultCompactSetImpl(expectedSize)
+        DefaultCompactSetImpl(initialSize)
     }
 }

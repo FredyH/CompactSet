@@ -37,7 +37,7 @@ interface CompactSet<T> {
  * elements in a primitive backing array instead. This is more efficient, since storing primitives in boxed form
  * incurs significant overhead in both performance and memory usage.
  */
-inline fun <reified T> newCompactSet(expectedSize: Int = 16): CompactSet<T> {
+inline fun <reified T> newCompactSet(initialSize: Int = 16): CompactSet<T> {
     @Suppress("UNCHECKED_CAST")
-    return createCompactSet(expectedSize, typeOf<T>()) as CompactSet<T>
+    return createCompactSet(initialSize, typeOf<T>()) as CompactSet<T>
 }
