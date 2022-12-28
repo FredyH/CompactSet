@@ -1,12 +1,14 @@
 package com.example.compactset.codegen
 
 import com.example.compactset.CompactSet
-import org.objectweb.asm.*
+import com.example.compactset.codegen.dsl.*
+import org.objectweb.asm.ClassWriter
+import org.objectweb.asm.Opcodes
+import org.objectweb.asm.Type
 
 /**
  * A class responsible for generating bytecode of a specialized implementation of a [CompactSet].
- * Defines the bytecode settings for the primitive type using [primitiveSettings] and creates a class in the
- * com.example.compactset package with the name [className].
+ * Requires defining methods and settings for dealing with the type at hand.
  *
  * The structure of the specialized classes follows very closely to the implementation given
  * by the default implementation, but instead it uses primitive arrays to achieve higher performance and
@@ -14,422 +16,221 @@ import org.objectweb.asm.*
  */
 internal class SpecializedCompactSetGenerator(
     val className: String,
-    private val primitiveSettings: PrimitiveTypeInstructionSettings
+    private val primitiveType: JVMType,
+    private val primitiveArrayType: JVMArrayType,
+    private val boxedType: JVMType,
+    private val primitiveHashCodeFunction: MethodSignature,
+    private val unboxMethod: MethodSignature,
+    private val zeroConstant: Any
 ) {
     private val setPackage: String = "com/example/compactset"
 
     private val fullyQualifiedClassName = "$setPackage/$className"
-    private val specializedArrayTypeName = "[${primitiveSettings.specializedTypeName}"
-    private val specializedTypeName = primitiveSettings.specializedTypeName
 
-    private val insertElementDescriptor = "([${specializedTypeName}${specializedTypeName})Z"
-    private val getElementIndexDescriptor = "([${specializedTypeName}${specializedTypeName})I"
 
+    private val backingArray =
+        ClassField(fullyQualifiedClassName, "backingArray", primitiveArrayType, Opcodes.ACC_PRIVATE)
+    private val size = ClassField(fullyQualifiedClassName, "size", IntType, Opcodes.ACC_PRIVATE)
+    private val containsZero = ClassField(fullyQualifiedClassName, "containsZero", BooleanType, Opcodes.ACC_PRIVATE)
+
+    private val mathMax =
+        MethodSignature("java/lang/Math", "max", listOf(IntType, IntType), IntType, Opcodes.ACC_STATIC)
+
+    private val floorMod =
+        MethodSignature("java/lang/Math", "floorMod", listOf(IntType, IntType), IntType, Opcodes.ACC_STATIC)
+
+    private val superConstructor =
+        MethodSignature("java/lang/Object", "<init>", listOf(), VoidType, Opcodes.ACC_PRIVATE)
+
+    private val constructor =
+        MethodSignature(fullyQualifiedClassName, "<init>", listOf(IntType), VoidType, Opcodes.ACC_PUBLIC)
+
+    private val getLoadFactor =
+        MethodSignature(fullyQualifiedClassName, "getLoadFactor", listOf(), FloatType, Opcodes.ACC_PRIVATE)
+
+    private val getSize =
+        MethodSignature(fullyQualifiedClassName, "getSize", listOf(), IntType, Opcodes.ACC_PUBLIC)
+
+
+    private val getElementIndex = MethodSignature(
+        owner = fullyQualifiedClassName,
+        name = "getElementIndex",
+        parameters = listOf(primitiveArrayType, primitiveType),
+        returnJVMType = IntType,
+        flags = Opcodes.ACC_PRIVATE
+    )
+
+    private val insertElement = MethodSignature(
+        owner = fullyQualifiedClassName,
+        name = "insertElement",
+        parameters = listOf(primitiveArrayType, primitiveType),
+        returnJVMType = BooleanType,
+        flags = Opcodes.ACC_PRIVATE
+    )
+
+    private val rehash = MethodSignature(
+        owner = fullyQualifiedClassName,
+        name = "rehash",
+        parameters = emptyList(),
+        returnJVMType = VoidType,
+        flags = Opcodes.ACC_PRIVATE
+    )
+
+    private val contains = MethodSignature(
+        owner = fullyQualifiedClassName,
+        name = "contains",
+        parameters = listOf(ObjectType("java/lang/Object")),
+        returnJVMType = BooleanType,
+        flags = Opcodes.ACC_PUBLIC
+    )
+
+    private val add = MethodSignature(
+        owner = fullyQualifiedClassName,
+        name = "add",
+        parameters = listOf(ObjectType("java/lang/Object")),
+        returnJVMType = BooleanType,
+        flags = Opcodes.ACC_PUBLIC
+    )
 
     private fun generateConstructor(cw: ClassWriter) {
-        val mv = cw.visitMethod(Opcodes.ACC_PUBLIC, "<init>", "(I)V", null, emptyArray())
+        cw.generateMethod(constructor) {
+            val thisParam = declareThis()
+            val sizeParam = declareParameter(IntType)
 
-        //Call object super constructor
-        mv.visitCode()
-        mv.visitVarInsn(Opcodes.ALOAD, 0)
-        mv.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false)
+            superConstructor.invokeStatement(thisParam)
 
-        //Initialize array using size argument of the constructor
-        mv.visitVarInsn(Opcodes.ALOAD, 0)
-
-        //Math.max(initialSize, 4)
-        mv.visitVarInsn(Opcodes.ILOAD, 1)
-        mv.visitInsn(Opcodes.ICONST_4)
-        mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Math", "max", "(II)I", false)
-
-        mv.visitIntInsn(Opcodes.NEWARRAY, primitiveSettings.specializedTypeCode)
-        mv.visitFieldInsn(Opcodes.PUTFIELD, fullyQualifiedClassName, "backingArray", specializedArrayTypeName)
-
-        mv.visitInsn(Opcodes.RETURN)
-
-        mv.visitMaxs(0, 0)
-        mv.visitEnd()
+            sizeParam.assign(mathMax.call(sizeParam, 4.asConstant()))
+            backingArray.assign(thisParam, newArray(primitiveType, sizeParam))
+            size.assign(thisParam, 0.asConstant())
+        }
     }
 
     private fun generateGetLoadFactorMethod(cw: ClassWriter) {
-        val mv = cw.visitMethod(Opcodes.ACC_PRIVATE, "getLoadFactor", "()F", null, emptyArray())
-        mv.visitCode()
+        cw.generateMethod(getLoadFactor) {
+            val thisParam = declareThis()
+            val sizeWithoutNull = declareVariable(IntType)
 
-        //Get size
-        val endLabel = Label()
-        mv.visitVarInsn(Opcodes.ALOAD, 0)
-        mv.visitFieldInsn(Opcodes.GETFIELD, fullyQualifiedClassName, "size", "I")
+            ifStatement(containsZero.load(thisParam)) {
+                sizeWithoutNull.assign(size.load(thisParam) - 1.asConstant())
+            } elseStatement {
+                sizeWithoutNull.assign(size.load(thisParam))
+            }
 
-        //If our array contains zero, subtract one from size (because zero does not appear in the backing array)
-        mv.visitVarInsn(Opcodes.ALOAD, 0)
-        mv.visitFieldInsn(Opcodes.GETFIELD, fullyQualifiedClassName, "containsZero", "Z")
-        mv.visitJumpInsn(Opcodes.IFEQ, endLabel)
-        mv.visitInsn(Opcodes.ICONST_1)
-        mv.visitInsn(Opcodes.ISUB)
-
-        //Convert our number of filled buckets to a float
-        mv.visitLabel(endLabel)
-        mv.visitInsn(Opcodes.I2F)
-
-        //Get size of backking array
-        mv.visitVarInsn(Opcodes.ALOAD, 0)
-        mv.visitFieldInsn(Opcodes.GETFIELD, fullyQualifiedClassName, "backingArray", specializedArrayTypeName)
-        mv.visitInsn(Opcodes.ARRAYLENGTH)
-        mv.visitInsn(Opcodes.I2F)
-
-        //Return ratio between the two
-        mv.visitInsn(Opcodes.FDIV)
-        mv.visitInsn(Opcodes.FRETURN)
-
-        mv.visitMaxs(0, 0)
-        mv.visitEnd()
-    }
-
-    private fun storeArrayValue(mv: MethodVisitor, arraySlot: Int, indexSlot: Int, valueSlot: Int) {
-        mv.visitVarInsn(Opcodes.ALOAD, arraySlot)
-        mv.visitVarInsn(Opcodes.ILOAD, indexSlot)
-        primitiveSettings.loadArrayEntry(mv)
-        primitiveSettings.storePrimitive(mv, valueSlot)
+            returnValue(sizeWithoutNull.castToFloat() / backingArray.load(thisParam).arrayLength().castToFloat())
+        }
     }
 
     private fun generateGetElementIndex(cw: ClassWriter) {
-        val arraySlot = 1
-        val elementSlot = 2
+        cw.generateMethod(getElementIndex) {
+            declareThis()
+            val arrayParam = declareParameter(primitiveArrayType)
+            val elementParam = declareParameter(primitiveType)
+            val indexVariable = declareVariable(IntType)
+            val currentValue = declareVariable(primitiveType)
 
-        val mv = cw.visitMethod(
-            Opcodes.ACC_PRIVATE,
-            "getElementIndex",
-            getElementIndexDescriptor,
-            null,
-            emptyArray()
-        )
-        mv.visitCode()
+            indexVariable.assign(floorMod.call(primitiveHashCodeFunction.call(elementParam), arrayParam.arrayLength()))
+            currentValue.assign(arrayParam[indexVariable])
 
-        primitiveSettings.loadPrimitive(mv, elementSlot)
-        primitiveSettings.calculateHashCode(mv)
-        mv.visitVarInsn(Opcodes.ALOAD, arraySlot)
-        mv.visitInsn(Opcodes.ARRAYLENGTH)
-        mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Math", "floorMod", "(II)I", false)
-
-        val indexSlot = elementSlot + primitiveSettings.slotSize
-        mv.visitVarInsn(Opcodes.ISTORE, indexSlot)
-
-        val currentValueSlot = indexSlot + 1
-        storeArrayValue(mv, arraySlot, indexSlot, currentValueSlot)
-
-        val conditionLabel = Label()
-        //Jump to condition check
-        mv.visitJumpInsn(Opcodes.GOTO, conditionLabel)
-
-        val loopBodyLabel = Label()
-        mv.visitLabel(loopBodyLabel)
-
-        //Check if the current value is the element we are looking for
-        val elementsNotEqualLabel = Label()
-        primitiveSettings.loadPrimitive(mv, currentValueSlot)
-        primitiveSettings.loadPrimitive(mv, elementSlot)
-        primitiveSettings.jumpNotEquals(mv, elementsNotEqualLabel)
-
-        mv.visitVarInsn(Opcodes.ILOAD, indexSlot)
-        mv.visitInsn(Opcodes.IRETURN)
-
-        mv.visitLabel(elementsNotEqualLabel)
-
-        mv.visitVarInsn(Opcodes.ILOAD, indexSlot)
-        mv.visitInsn(Opcodes.ICONST_1)
-        mv.visitInsn(Opcodes.IADD)
-        mv.visitVarInsn(Opcodes.ALOAD, arraySlot)
-        mv.visitInsn(Opcodes.ARRAYLENGTH)
-        mv.visitInsn(Opcodes.IREM)
-        mv.visitVarInsn(Opcodes.ISTORE, indexSlot)
-
-        storeArrayValue(mv, arraySlot, indexSlot, currentValueSlot)
-
-        mv.visitLabel(conditionLabel)
-        //Condition check, if not zero, run loop body
-        primitiveSettings.loadPrimitive(mv, currentValueSlot)
-        primitiveSettings.loadZero(mv)
-        primitiveSettings.jumpNotEquals(mv, loopBodyLabel)
-
-
-        mv.visitVarInsn(Opcodes.ILOAD, indexSlot)
-        mv.visitInsn(Opcodes.IRETURN)
-
-        mv.visitMaxs(0, 0)
-        mv.visitEnd()
+            whileLoop(currentValue.neq(zeroConstant.asConstant())) {
+                ifStatement(currentValue.eq(elementParam)) {
+                    returnValue(indexVariable)
+                }
+                indexVariable.assign((indexVariable + 1.asConstant()) % arrayParam.arrayLength())
+                currentValue.assign(arrayParam[indexVariable])
+            }
+            returnValue(indexVariable)
+        }
     }
 
     private fun generateInsertElementMethod(cw: ClassWriter) {
-        val arraySlot = 1
-        val elementSlot = 2
-        val indexSlot = elementSlot + primitiveSettings.slotSize
+        cw.generateMethod(insertElement) {
+            val thisParam = declareThis()
+            val arrayParam = declareParameter(primitiveArrayType)
+            val elementParam = declareParameter(primitiveType)
+            val indexVariable = declareVariable(IntType)
 
-        val mv = cw.visitMethod(
-            Opcodes.ACC_PRIVATE,
-            "insertElement",
-            insertElementDescriptor,
-            null,
-            emptyArray()
-        )
-        mv.visitCode()
+            indexVariable.assign(getElementIndex.call(thisParam, arrayParam, elementParam))
+            ifStatement(arrayParam[indexVariable].neq(zeroConstant.asConstant())) {
+                returnValue(false.asConstant())
+            }
 
-        mv.visitVarInsn(Opcodes.ALOAD, 0)
-        mv.visitVarInsn(Opcodes.ALOAD, arraySlot)
-        primitiveSettings.loadPrimitive(mv, elementSlot)
-        mv.visitMethodInsn(
-            Opcodes.INVOKESPECIAL,
-            fullyQualifiedClassName,
-            "getElementIndex",
-            getElementIndexDescriptor,
-            false
-        )
-        mv.visitVarInsn(Opcodes.ISTORE, indexSlot)
-
-        val returnFalseLabel = Label()
-        mv.visitVarInsn(Opcodes.ALOAD, arraySlot)
-        mv.visitVarInsn(Opcodes.ILOAD, indexSlot)
-        primitiveSettings.loadArrayEntry(mv)
-        primitiveSettings.loadZero(mv)
-        primitiveSettings.jumpNotEquals(mv, returnFalseLabel)
-
-        mv.visitVarInsn(Opcodes.ALOAD, arraySlot)
-        mv.visitVarInsn(Opcodes.ILOAD, indexSlot)
-        primitiveSettings.loadPrimitive(mv, elementSlot)
-        primitiveSettings.storeInArray(mv)
-        mv.visitInsn(Opcodes.ICONST_1)
-        mv.visitInsn(Opcodes.IRETURN)
-
-
-        mv.visitLabel(returnFalseLabel)
-        mv.visitInsn(Opcodes.ICONST_0)
-        mv.visitInsn(Opcodes.IRETURN)
-
-        mv.visitMaxs(0, 0)
-        mv.visitEnd()
+            arrayParam[indexVariable] = elementParam
+            returnValue(true.asConstant())
+        }
     }
 
 
     private fun generateRehashMethod(cw: ClassWriter) {
-        val newArraySlot = 1
-        val oldArraySlot = 2
-        val oldSizeSlot = 3
-        val indexSlot = 4
+        cw.generateMethod(rehash) {
+            val thisParam = declareThis()
+            val newArray = declareVariable(primitiveArrayType)
+            val currentElem = declareVariable(primitiveType)
 
-        val mv = cw.visitMethod(Opcodes.ACC_PRIVATE, "rehash", "()V", null, emptyArray())
-        mv.visitCode()
+            newArray.assign(newArray(primitiveType, backingArray.load(thisParam).arrayLength() * 2.asConstant()))
 
-        mv.visitVarInsn(Opcodes.ALOAD, 0)
-        mv.visitFieldInsn(Opcodes.GETFIELD, fullyQualifiedClassName, "backingArray", specializedArrayTypeName)
-        mv.visitInsn(Opcodes.DUP)
-        mv.visitVarInsn(Opcodes.ASTORE, oldArraySlot)
-        mv.visitInsn(Opcodes.ARRAYLENGTH)
-        mv.visitInsn(Opcodes.DUP)
-        mv.visitVarInsn(Opcodes.ISTORE, oldSizeSlot)
-        mv.visitInsn(Opcodes.ICONST_2)
-        mv.visitInsn(Opcodes.IMUL)
-        mv.visitIntInsn(Opcodes.NEWARRAY, primitiveSettings.specializedTypeCode)
-        mv.visitVarInsn(Opcodes.ASTORE, newArraySlot)
+            forEachLoop(currentElem, backingArray.load(thisParam)) {
+                ifStatement(currentElem.eq(zeroConstant.asConstant())) {
+                    continueStatement()
+                }
+                insertElement.invokeStatement(thisParam, newArray, currentElem)
+            }
 
-        mv.visitInsn(Opcodes.ICONST_0)
-        mv.visitVarInsn(Opcodes.ISTORE, indexSlot)
-        val conditionLabel = Label()
-        val loopBodyLabel = Label()
-        val loopIncLabel = Label()
-        mv.visitJumpInsn(Opcodes.GOTO, conditionLabel)
-
-
-        mv.visitLabel(loopBodyLabel)
-        mv.visitVarInsn(Opcodes.ALOAD, oldArraySlot)
-        mv.visitVarInsn(Opcodes.ILOAD, indexSlot)
-        primitiveSettings.loadArrayEntry(mv)
-        primitiveSettings.loadZero(mv)
-        primitiveSettings.jumpEquals(mv, loopIncLabel)
-
-        mv.visitVarInsn(Opcodes.ALOAD, 0)
-        mv.visitVarInsn(Opcodes.ALOAD, newArraySlot)
-        mv.visitVarInsn(Opcodes.ALOAD, oldArraySlot)
-        mv.visitVarInsn(Opcodes.ILOAD, indexSlot)
-        primitiveSettings.loadArrayEntry(mv)
-        mv.visitMethodInsn(
-            Opcodes.INVOKESPECIAL,
-            fullyQualifiedClassName,
-            "insertElement",
-            insertElementDescriptor,
-            false
-        )
-        mv.visitInsn(Opcodes.POP)
-
-
-        mv.visitLabel(loopIncLabel)
-        mv.visitIincInsn(indexSlot, 1)
-        mv.visitLabel(conditionLabel)
-        mv.visitVarInsn(Opcodes.ILOAD, indexSlot)
-        mv.visitVarInsn(Opcodes.ILOAD, oldSizeSlot)
-        mv.visitJumpInsn(Opcodes.IF_ICMPLT, loopBodyLabel)
-
-
-        mv.visitVarInsn(Opcodes.ALOAD, 0)
-        mv.visitVarInsn(Opcodes.ALOAD, newArraySlot)
-        mv.visitFieldInsn(Opcodes.PUTFIELD, fullyQualifiedClassName, "backingArray", specializedArrayTypeName)
-        mv.visitInsn(Opcodes.RETURN)
-
-
-        mv.visitMaxs(0, 0)
-        mv.visitEnd()
+            backingArray.assign(thisParam, newArray)
+        }
     }
 
     private fun generateGetSizeMethod(cw: ClassWriter) {
-        val mv = cw.visitMethod(Opcodes.ACC_PUBLIC, "getSize", "()I", null, emptyArray())
-        mv.visitCode()
-
-        //Load size from object's field and return it
-        mv.visitVarInsn(Opcodes.ALOAD, 0)
-        mv.visitFieldInsn(Opcodes.GETFIELD, fullyQualifiedClassName, "size", "I")
-        mv.visitInsn(Opcodes.IRETURN)
-
-        mv.visitMaxs(0, 0)
-        mv.visitEnd()
+        cw.generateMethod(getSize) {
+            val thisParam = declareThis()
+            returnValue(size.load(thisParam))
+        }
     }
 
     private fun generateContainsMethod(cw: ClassWriter) {
-        val boxedValueSlot = 1
-        val valueSlot = boxedValueSlot + 1
-        val arraySlot = valueSlot + primitiveSettings.slotSize
-        val indexSlot = arraySlot + 1
+        cw.generateMethod(contains) {
+            val thisParam = declareThis()
+            val boxedParam = declareParameter(ObjectType("java/lang/Object"))
+            val primitiveVar = declareVariable(primitiveType)
 
-        val mv = cw.visitMethod(Opcodes.ACC_PUBLIC, "contains", "(Ljava/lang/Object;)Z", null, emptyArray())
-        mv.visitCode()
+            primitiveVar.assign(unboxMethod.call(boxedParam.objectCast(boxedType)))
+            ifStatement(primitiveVar.eq(zeroConstant.asConstant())) {
+                returnValue(containsZero.load(thisParam))
+            }
 
-        val elseCaseLabel = Label()
-        mv.visitVarInsn(Opcodes.ALOAD, boxedValueSlot)
-        primitiveSettings.unboxPrimitive(mv)
-        primitiveSettings.storePrimitive(mv, valueSlot)
+            val indexParam = declareVariable(IntType)
+            indexParam.assign(getElementIndex.call(thisParam, backingArray.load(thisParam), primitiveVar))
 
-        primitiveSettings.loadPrimitive(mv, valueSlot)
-        primitiveSettings.loadZero(mv)
-        primitiveSettings.jumpNotEquals(mv, elseCaseLabel)
-        mv.visitVarInsn(Opcodes.ALOAD, 0)
-        mv.visitFieldInsn(Opcodes.GETFIELD, fullyQualifiedClassName, "containsZero", "Z")
-        mv.visitInsn(Opcodes.IRETURN)
-
-        mv.visitLabel(elseCaseLabel)
-        mv.visitVarInsn(Opcodes.ALOAD, 0)
-        mv.visitFieldInsn(Opcodes.GETFIELD, fullyQualifiedClassName, "backingArray", specializedArrayTypeName)
-        mv.visitVarInsn(Opcodes.ASTORE, arraySlot)
-
-        mv.visitVarInsn(Opcodes.ALOAD, 0)
-        mv.visitVarInsn(Opcodes.ALOAD, arraySlot)
-        primitiveSettings.loadPrimitive(mv, valueSlot)
-        mv.visitMethodInsn(
-            Opcodes.INVOKESPECIAL,
-            fullyQualifiedClassName,
-            "getElementIndex",
-            getElementIndexDescriptor,
-            false
-        )
-        mv.visitVarInsn(Opcodes.ISTORE, indexSlot)
-
-        mv.visitVarInsn(Opcodes.ALOAD, arraySlot)
-        mv.visitVarInsn(Opcodes.ILOAD, indexSlot)
-        primitiveSettings.loadArrayEntry(mv)
-
-        val zeroLabel = Label()
-        primitiveSettings.loadZero(mv)
-        primitiveSettings.jumpEquals(mv, zeroLabel)
-        mv.visitInsn(Opcodes.ICONST_1)
-        mv.visitInsn(Opcodes.IRETURN)
-
-        mv.visitLabel(zeroLabel)
-        mv.visitInsn(Opcodes.ICONST_0)
-        mv.visitInsn(Opcodes.IRETURN)
-
-        mv.visitMaxs(0, 0)
-        mv.visitEnd()
+            returnValue(backingArray.load(thisParam)[indexParam].neq(zeroConstant.asConstant()))
+        }
     }
 
     private fun generateAddMethod(cw: ClassWriter) {
-        val mv = cw.visitMethod(Opcodes.ACC_PUBLIC, "add", "(Ljava/lang/Object;)Z", null, emptyArray())
-        mv.visitCode()
+        cw.generateMethod(add) {
+            val thisParam = declareThis()
+            val boxedParam = declareParameter(ObjectType("java/lang/Object"))
+            val primitiveVar = declareVariable(primitiveType)
 
-        val boxedSlot = 1
-        val primitiveSlot = boxedSlot + 1;
+            primitiveVar.assign(unboxMethod.call(boxedParam.objectCast(boxedType)))
+            ifStatement(primitiveVar.eq(zeroConstant.asConstant())) {
+                ifStatement(containsZero.load(thisParam)) {
+                    returnValue(false.asConstant())
+                }
+                containsZero.assign(thisParam, true.asConstant())
+                size.assign(thisParam, size.load(thisParam) + 1.asConstant())
+                returnValue(true.asConstant())
+            }
 
-        mv.visitVarInsn(Opcodes.ALOAD, boxedSlot)
-        primitiveSettings.unboxPrimitive(mv)
-        primitiveSettings.storePrimitive(mv, primitiveSlot)
+            ifStatement(getLoadFactor.call(thisParam).gt(0.6f.asConstant())) {
+                rehash.invokeStatement(thisParam)
+            }
 
-        val notZeroLabel = Label()
-        primitiveSettings.loadPrimitive(mv, primitiveSlot)
-        primitiveSettings.loadZero(mv)
-        primitiveSettings.jumpNotEquals(mv, notZeroLabel)
+            ifStatement(!insertElement.call(thisParam, backingArray.load(thisParam), primitiveVar)) {
+                returnValue(false.asConstant())
+            }
+            size.assign(thisParam, size.load(thisParam) + 1.asConstant())
 
-        val doesNotContainZero = Label()
-        mv.visitVarInsn(Opcodes.ALOAD, 0)
-        mv.visitFieldInsn(Opcodes.GETFIELD, fullyQualifiedClassName, "containsZero", "Z")
-        mv.visitJumpInsn(Opcodes.IFEQ, doesNotContainZero)
-        mv.visitInsn(Opcodes.ICONST_0)
-        mv.visitInsn(Opcodes.IRETURN)
-
-        mv.visitLabel(doesNotContainZero)
-
-        //containsZero = true
-        mv.visitVarInsn(Opcodes.ALOAD, 0)
-        mv.visitInsn(Opcodes.ICONST_1)
-        mv.visitFieldInsn(Opcodes.PUTFIELD, fullyQualifiedClassName, "containsZero", "Z")
-
-        mv.visitVarInsn(Opcodes.ALOAD, 0)
-        mv.visitVarInsn(Opcodes.ALOAD, 0)
-        mv.visitFieldInsn(Opcodes.GETFIELD, fullyQualifiedClassName, "size", "I")
-        mv.visitInsn(Opcodes.ICONST_1)
-        mv.visitInsn(Opcodes.IADD)
-        mv.visitFieldInsn(Opcodes.PUTFIELD, fullyQualifiedClassName, "size", "I")
-        mv.visitInsn(Opcodes.ICONST_1)
-        mv.visitInsn(Opcodes.IRETURN)
-
-
-        val noRehashLabel = Label()
-        mv.visitLabel(notZeroLabel)
-        mv.visitVarInsn(Opcodes.ALOAD, 0)
-        mv.visitMethodInsn(Opcodes.INVOKESPECIAL, fullyQualifiedClassName, "getLoadFactor", "()F", false)
-        mv.visitLdcInsn(0.6f)
-        mv.visitInsn(Opcodes.FCMPL)
-        mv.visitJumpInsn(Opcodes.IFLE, noRehashLabel)
-
-        mv.visitVarInsn(Opcodes.ALOAD, 0)
-        mv.visitMethodInsn(Opcodes.INVOKESPECIAL, fullyQualifiedClassName, "rehash", "()V", false)
-
-        mv.visitLabel(noRehashLabel)
-
-        mv.visitVarInsn(Opcodes.ALOAD, 0)
-        mv.visitVarInsn(Opcodes.ALOAD, 0)
-        mv.visitFieldInsn(Opcodes.GETFIELD, fullyQualifiedClassName, "backingArray", specializedArrayTypeName)
-        primitiveSettings.loadPrimitive(mv, primitiveSlot)
-        mv.visitMethodInsn(
-            Opcodes.INVOKESPECIAL,
-            fullyQualifiedClassName,
-            "insertElement",
-            insertElementDescriptor,
-            false
-        )
-        val returnFalseLabel = Label()
-        mv.visitJumpInsn(Opcodes.IFEQ, returnFalseLabel)
-
-        mv.visitVarInsn(Opcodes.ALOAD, 0)
-        mv.visitVarInsn(Opcodes.ALOAD, 0)
-        mv.visitFieldInsn(Opcodes.GETFIELD, fullyQualifiedClassName, "size", "I")
-        mv.visitInsn(Opcodes.ICONST_1)
-        mv.visitInsn(Opcodes.IADD)
-        mv.visitFieldInsn(Opcodes.PUTFIELD, fullyQualifiedClassName, "size", "I")
-        mv.visitInsn(Opcodes.ICONST_1)
-        mv.visitInsn(Opcodes.IRETURN)
-
-
-        mv.visitLabel(returnFalseLabel)
-        mv.visitInsn(Opcodes.ICONST_0)
-        mv.visitInsn(Opcodes.IRETURN)
-
-        mv.visitMaxs(0, 0)
-        mv.visitEnd()
+            returnValue(true.asConstant())
+        }
     }
 
     /**
@@ -444,14 +245,14 @@ internal class SpecializedCompactSetGenerator(
             Opcodes.V11,
             Opcodes.ACC_PUBLIC or Opcodes.ACC_FINAL or Opcodes.ACC_SUPER,
             fullyQualifiedClassName,
-            "Ljava/lang/Object;L$compactSetClassName<L${primitiveSettings.boxedTypeName};>;",
+            "Ljava/lang/Object;L$compactSetClassName<${boxedType.typeName}>;",
             "java/lang/Object",
             arrayOf(compactSetClassName)
         )
 
-        cw.visitField(Opcodes.ACC_PRIVATE, "containsZero", "Z", null, false)
-        cw.visitField(Opcodes.ACC_PRIVATE, "backingArray", specializedArrayTypeName, null, null)
-        cw.visitField(Opcodes.ACC_PRIVATE, "size", "I", null, 0)
+        containsZero.addToClass(cw)
+        backingArray.addToClass(cw)
+        size.addToClass(cw)
 
         generateConstructor(cw)
 

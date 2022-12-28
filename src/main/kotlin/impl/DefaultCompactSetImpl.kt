@@ -4,6 +4,8 @@ import com.example.compactset.CompactSet
 
 /**
  * The default implementation of [CompactSet] for non-primitive types.
+ *
+ * Uses open addressing hashing with linear probing.
  */
 internal class DefaultCompactSetImpl<T>(initialSize: Int) : CompactSet<T> {
     private var containsNull: Boolean = false

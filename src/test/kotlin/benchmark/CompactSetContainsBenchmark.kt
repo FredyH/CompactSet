@@ -10,7 +10,8 @@ import kotlin.random.Random
 @State(Scope.Benchmark)
 @Warmup(iterations = 3)
 @Measurement(iterations = 3, time = 3, timeUnit = TimeUnit.SECONDS)
-open class DefaultCompactSetInsertBenchmark {
+open class CompactSetContainsBenchmark {
+
     private lateinit var compactSet: CompactSet<Int?>
     private lateinit var specializedCompactSet: CompactSet<Int>
     private lateinit var hashSet: HashSet<Int>
@@ -22,27 +23,35 @@ open class DefaultCompactSetInsertBenchmark {
         compactSet = newCompactSet(16)
         specializedCompactSet = newCompactSet(16)
         hashSet = HashSet(16)
+
+        for (i in 1..10000) {
+            val v = Random.nextInt()
+            compactSet.add(v)
+            specializedCompactSet.add(v)
+            hashSet.add(v)
+        }
+
         valueArray = Array(1000) { Random.nextInt() }
     }
 
     @Benchmark
     open fun benchmarkSpecializedCompactSet(blackhole: Blackhole) {
         valueArray.forEach {
-            blackhole.consume(specializedCompactSet.add(it))
+            blackhole.consume(specializedCompactSet.contains(it))
         }
     }
 
     @Benchmark
     open fun benchmarkCompactSet(blackhole: Blackhole) {
         valueArray.forEach {
-            blackhole.consume(compactSet.add(it))
+            blackhole.consume(compactSet.contains(it))
         }
     }
 
     @Benchmark
     open fun benchmarkHashSet(blackhole: Blackhole) {
         valueArray.forEach {
-            blackhole.consume(hashSet.add(it))
+            blackhole.consume(hashSet.contains(it))
         }
     }
 }

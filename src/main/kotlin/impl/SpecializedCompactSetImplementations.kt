@@ -3,22 +3,75 @@ package com.example.compactset.impl
 import com.example.compactset.CompactSet
 import com.example.compactset.codegen.*
 import com.example.compactset.codegen.CompactSetClassLoader
+import com.example.compactset.codegen.dsl.*
+import org.objectweb.asm.Opcodes
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
 
-private val generatorMap = mapOf<KClass<*>, SpecializedCompactSetGenerator>(
+internal val generatorMap = mapOf<KClass<*>, SpecializedCompactSetGenerator>(
     Int::class to SpecializedCompactSetGenerator(
         className = "IntCompactSetImpl",
-        primitiveSettings = IntInstructionSettings
+        primitiveType = IntType,
+        primitiveArrayType = IntArrayType,
+        primitiveHashCodeFunction = MethodSignature(
+            owner = "java/lang/Integer",
+            name = "hashCode",
+            parameters = listOf(IntType),
+            returnJVMType = IntType,
+            flags = Opcodes.ACC_STATIC
+        ),
+        boxedType = ObjectType("java/lang/Integer"),
+        unboxMethod = MethodSignature(
+            owner = "java/lang/Integer",
+            name = "intValue",
+            parameters = listOf(),
+            returnJVMType = IntType,
+            flags = Opcodes.ACC_PUBLIC
+        ),
+        zeroConstant = 0
     ),
     Long::class to SpecializedCompactSetGenerator(
         className = "LongCompactSetImpl",
-        primitiveSettings = LongInstructionSettings
+        primitiveType = LongType,
+        primitiveArrayType = LongArrayType,
+        primitiveHashCodeFunction = MethodSignature(
+            owner = "java/lang/Long",
+            name = "hashCode",
+            parameters = listOf(LongType),
+            returnJVMType = IntType,
+            flags = Opcodes.ACC_STATIC
+        ),
+        boxedType = ObjectType("java/lang/Long"),
+        unboxMethod = MethodSignature(
+            owner = "java/lang/Long",
+            name = "longValue",
+            parameters = listOf(),
+            returnJVMType = LongType,
+            flags = Opcodes.ACC_PUBLIC
+        ),
+        zeroConstant = 0L
     ),
     Double::class to SpecializedCompactSetGenerator(
         className = "DoubleCompactSetImpl",
-        primitiveSettings = DoubleInstructionSettings
+        primitiveType = DoubleType,
+        primitiveArrayType = DoubleArrayType,
+        primitiveHashCodeFunction = MethodSignature(
+            owner = "java/lang/Double",
+            name = "hashCode",
+            parameters = listOf(DoubleType),
+            returnJVMType = IntType,
+            flags = Opcodes.ACC_STATIC
+        ),
+        boxedType = ObjectType("java/lang/Double"),
+        unboxMethod = MethodSignature(
+            owner = "java/lang/Double",
+            name = "doubleValue",
+            parameters = listOf(),
+            returnJVMType = DoubleType,
+            flags = Opcodes.ACC_PUBLIC
+        ),
+        zeroConstant = 0.0
     )
 )
 

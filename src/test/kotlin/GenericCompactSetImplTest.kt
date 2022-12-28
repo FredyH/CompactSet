@@ -13,7 +13,7 @@ import kotlin.random.Random
  * they are just different types of values that are stored.
  */
 internal abstract class GenericCompactSetImplTest<T> : WordSpec() {
-    abstract fun createSet(): CompactSet<T>
+    abstract fun createSet(initialSize: Int = 16): CompactSet<T>
 
     abstract fun generateRandomValue(): T
 
@@ -75,6 +75,16 @@ internal abstract class GenericCompactSetImplTest<T> : WordSpec() {
                 set.contains(value).shouldBeTrue()
                 set.add(value).shouldBeFalse()
                 set.contains(value).shouldBeTrue()
+            }
+
+            "not break with 0 initial size" {
+                val set = createSet(0)
+                for (i in 1..100) {
+                    val value = getNextDistinctValue()
+                    set.contains(value).shouldBeFalse()
+                    set.add(value).shouldBeTrue()
+                    set.contains(value).shouldBeTrue()
+                }
             }
 
             "return the correct size after adding elements" {
@@ -149,32 +159,32 @@ internal abstract class GenericCompactSetImplTest<T> : WordSpec() {
 }
 
 internal class DefaultCompactSetImplTest : GenericCompactSetImplTest<String?>() {
-    override fun createSet(): CompactSet<String?> = newCompactSet()
+    override fun createSet(initialSize: Int): CompactSet<String?> = newCompactSet(initialSize)
     override val defaultArrayValue: String? = null
     override fun generateRandomValue(): String = Random.nextInt().toString()
 }
 
 internal class BoxedCompactSetImplTest : GenericCompactSetImplTest<Double?>() {
-    override fun createSet(): CompactSet<Double?> = newCompactSet()
+    override fun createSet(initialSize: Int): CompactSet<Double?> = newCompactSet(initialSize)
     override val defaultArrayValue: Double? = null
     override fun generateRandomValue(): Double = Random.nextDouble()
 }
 
 
 internal class IntCompactSetImplTest : GenericCompactSetImplTest<Int>() {
-    override fun createSet(): CompactSet<Int> = newCompactSet()
+    override fun createSet(initialSize: Int): CompactSet<Int> = newCompactSet(initialSize)
     override val defaultArrayValue: Int = 0
     override fun generateRandomValue(): Int = Random.nextInt()
 }
 
 internal class LongCompactSetImplTest : GenericCompactSetImplTest<Long>() {
-    override fun createSet(): CompactSet<Long> = newCompactSet()
+    override fun createSet(initialSize: Int): CompactSet<Long> = newCompactSet(initialSize)
     override val defaultArrayValue: Long = 0L
     override fun generateRandomValue(): Long = Random.nextLong()
 }
 
 internal class DoubleCompactSetImplTest : GenericCompactSetImplTest<Double>() {
-    override fun createSet(): CompactSet<Double> = newCompactSet()
+    override fun createSet(initialSize: Int): CompactSet<Double> = newCompactSet(initialSize)
     override val defaultArrayValue: Double = 0.0
     override fun generateRandomValue(): Double = Random.nextDouble()
 }

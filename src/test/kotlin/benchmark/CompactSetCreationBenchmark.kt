@@ -10,7 +10,7 @@ import kotlin.random.Random
 @State(Scope.Benchmark)
 @Warmup(iterations = 3)
 @Measurement(iterations = 3, time = 3, timeUnit = TimeUnit.SECONDS)
-open class DefaultCompactSetCreationBenchmark {
+open class CompactSetCreationBenchmark {
 
     private lateinit var compactSet: CompactSet<Int?>
     private lateinit var specializedCompactSet: CompactSet<Int>
