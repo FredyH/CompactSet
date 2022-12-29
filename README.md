@@ -145,16 +145,16 @@ each operation will increase the size of the existing set, the set getting large
 
 | Implementation        | Performance (ops/s) |
 |-----------------------|---------------------|
-| HashSet               | 8913794             |
-| DefaultCompactSet     | 158780814           |
-| SpecializedCompactSet | 237234593           |
+| HashSet               | 10089744            |
+| DefaultCompactSet     | 168442986           |
+| SpecializedCompactSet | 254036749           |
 
 Checking if an element (that is contained) is contained within an existing set of size `10000`:
 
 | Implementation        | Performance (ops/s) |
 |-----------------------|---------------------|
-| HashSet               | 166946664           |
-| DefaultCompactSet     | 224524307           |
+| HashSet               | 224524307           |
+| DefaultCompactSet     | 166946664           |
 | SpecializedCompactSet | 326134688           |
 
 As can be seen, both the default and specialized implementation are significantly faster at inserting elements
