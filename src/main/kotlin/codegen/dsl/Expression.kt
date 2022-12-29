@@ -159,12 +159,6 @@ class RemainderExpression(left: Expression, right: Expression) : NumericBinaryEx
     }
 }
 
-class ThisExpression(override val type: JVMType) : Expression() {
-    override fun emitCode(mv: MethodVisitor) {
-        mv.visitVarInsn(Opcodes.ALOAD, 0)
-    }
-}
-
 class ArrayLengthExpression(private val expression: Expression) : Expression() {
     init {
         if (expression.type !is JVMArrayType) {
@@ -279,7 +273,7 @@ class IndexArrayExpression(
 
 class NewArrayExpression(
     private val sizeExpression: Expression,
-    internal val elementType: JVMType,
+    private val elementType: JVMType,
 ) : Expression() {
     init {
         if (sizeExpression.type != IntType) {
@@ -302,7 +296,7 @@ class NewArrayExpression(
 
 class FunctionCallExpression(
     internal val methodSignature: MethodSignature,
-    internal val parameters: List<Expression>
+    private val parameters: List<Expression>
 ) : Expression() {
     override val type: JVMType = methodSignature.returnType
 

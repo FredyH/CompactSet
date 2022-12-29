@@ -31,9 +31,9 @@ class ReturnValueStatement(private val valueExpression: Expression) : Statement(
 }
 
 class FieldAssignment(
-    internal val variable: ClassField,
-    internal val objectInstance: Expression,
-    internal val expression: Expression
+    private val variable: ClassField,
+    private val objectInstance: Expression,
+    private val expression: Expression
 ) : Statement() {
     override fun emitCode(mv: MethodVisitor) {
         objectInstance.emitCode(mv)
@@ -43,8 +43,8 @@ class FieldAssignment(
 }
 
 class VariableAssignment(
-    internal val variable: LocalVariable,
-    internal val expression: Expression
+    private val variable: LocalVariable,
+    private val expression: Expression
 ) : Statement() {
     override fun emitCode(mv: MethodVisitor) {
         expression.emitCode(mv)
@@ -53,9 +53,9 @@ class VariableAssignment(
 }
 
 class StoreInArrayStatement(
-    internal val arrayExpression: Expression,
-    internal val indexExpression: Expression,
-    internal val valueExpression: Expression,
+    private val arrayExpression: Expression,
+    private val indexExpression: Expression,
+    private val valueExpression: Expression,
 ) : Statement() {
     override fun emitCode(mv: MethodVisitor) {
         arrayExpression.emitCode(mv)

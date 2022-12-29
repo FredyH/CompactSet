@@ -8,7 +8,15 @@ import com.example.compactset.CompactSet
  * Uses open addressing hashing with linear probing.
  */
 internal class DefaultCompactSetImpl<T>(initialSize: Int) : CompactSet<T> {
+
+    /**
+     * We want to use the null value as a special placeholder that indicates an empty slot, so we cannot
+     * allow for it to be added to the array, as it would be indistinguishable from the empty slot.
+     * Instead of adding null to the array, we use this boolean to indicate whether or not null is in this set.
+     */
     private var containsNull: Boolean = false
+
+
     private var backingArray = Array<Any?>(initialSize.coerceAtLeast(4)) { null }
 
     override var size: Int = 0

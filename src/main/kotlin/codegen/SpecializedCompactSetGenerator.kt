@@ -99,7 +99,7 @@ internal class SpecializedCompactSetGenerator(
 
             superConstructor.invokeStatement(thisParam)
 
-            sizeParam.assign(mathMax.call(sizeParam, 4.asConstant()))
+            sizeParam.assign(mathMax(sizeParam, 4.asConstant()))
             backingArray.assign(thisParam, newArray(primitiveType, sizeParam))
             size.assign(thisParam, 0.asConstant())
         }
@@ -128,7 +128,7 @@ internal class SpecializedCompactSetGenerator(
             val indexVariable = declareVariable(IntType)
             val currentValue = declareVariable(primitiveType)
 
-            indexVariable.assign(floorMod.call(primitiveHashCodeFunction.call(elementParam), arrayParam.arrayLength()))
+            indexVariable.assign(floorMod(primitiveHashCodeFunction(elementParam), arrayParam.arrayLength()))
             currentValue.assign(arrayParam[indexVariable])
 
             whileLoop(currentValue.neq(zeroConstant.asConstant())) {
@@ -149,7 +149,7 @@ internal class SpecializedCompactSetGenerator(
             val elementParam = declareParameter(primitiveType)
             val indexVariable = declareVariable(IntType)
 
-            indexVariable.assign(getElementIndex.call(thisParam, arrayParam, elementParam))
+            indexVariable.assign(getElementIndex(thisParam, arrayParam, elementParam))
             ifStatement(arrayParam[indexVariable].neq(zeroConstant.asConstant())) {
                 returnValue(false.asConstant())
             }
@@ -192,13 +192,13 @@ internal class SpecializedCompactSetGenerator(
             val boxedParam = declareParameter(ObjectType("java/lang/Object"))
             val primitiveVar = declareVariable(primitiveType)
 
-            primitiveVar.assign(unboxMethod.call(boxedParam.objectCast(boxedType)))
+            primitiveVar.assign(unboxMethod(boxedParam.objectCast(boxedType)))
             ifStatement(primitiveVar.eq(zeroConstant.asConstant())) {
                 returnValue(containsZero.load(thisParam))
             }
 
             val indexParam = declareVariable(IntType)
-            indexParam.assign(getElementIndex.call(thisParam, backingArray.load(thisParam), primitiveVar))
+            indexParam.assign(getElementIndex(thisParam, backingArray.load(thisParam), primitiveVar))
 
             returnValue(backingArray.load(thisParam)[indexParam].neq(zeroConstant.asConstant()))
         }
@@ -210,7 +210,7 @@ internal class SpecializedCompactSetGenerator(
             val boxedParam = declareParameter(ObjectType("java/lang/Object"))
             val primitiveVar = declareVariable(primitiveType)
 
-            primitiveVar.assign(unboxMethod.call(boxedParam.objectCast(boxedType)))
+            primitiveVar.assign(unboxMethod(boxedParam.objectCast(boxedType)))
             ifStatement(primitiveVar.eq(zeroConstant.asConstant())) {
                 ifStatement(containsZero.load(thisParam)) {
                     returnValue(false.asConstant())
@@ -220,11 +220,11 @@ internal class SpecializedCompactSetGenerator(
                 returnValue(true.asConstant())
             }
 
-            ifStatement(getLoadFactor.call(thisParam).gt(0.6f.asConstant())) {
+            ifStatement(getLoadFactor(thisParam).gt(0.6f.asConstant())) {
                 rehash.invokeStatement(thisParam)
             }
 
-            ifStatement(!insertElement.call(thisParam, backingArray.load(thisParam), primitiveVar)) {
+            ifStatement(!insertElement(thisParam, backingArray.load(thisParam), primitiveVar)) {
                 returnValue(false.asConstant())
             }
             size.assign(thisParam, size.load(thisParam) + 1.asConstant())

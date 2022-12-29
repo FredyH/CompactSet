@@ -182,7 +182,7 @@ class MethodGeneratorScope internal constructor(methodSignature: MethodSignature
         }
     }
 
-    fun MethodSignature.call(vararg expressions: Expression): Expression {
+    operator fun MethodSignature.invoke(vararg expressions: Expression): Expression {
         if (this.returnType is VoidType) {
             throw IllegalStateException("Cannot use void function as expression")
         }
