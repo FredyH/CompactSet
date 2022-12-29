@@ -4,7 +4,16 @@ import org.objectweb.asm.Label
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
 
+/**
+ * A class representing a statement in the code.
+ * A statement should be self-contained w.r.t. the JVM-stack. That is, the JVM-stack
+ * should look the same before and after this statement is done, to avoid stack overflow/underflow.
+ */
 abstract class Statement {
+
+    /**
+     * Emits the code of this statement.
+     */
     abstract fun emitCode(mv: MethodVisitor)
 }
 
@@ -59,7 +68,7 @@ class StoreInArrayStatement(
 class FunctionCallStatement(private val functionCallExpression: FunctionCallExpression) : Statement() {
     override fun emitCode(mv: MethodVisitor) {
         functionCallExpression.emitCode(mv)
-        val returnType = functionCallExpression.methodSignature.returnJVMType
+        val returnType = functionCallExpression.methodSignature.returnType
 
         if (returnType.slotSize == 2) {
             mv.visitInsn(Opcodes.POP2)

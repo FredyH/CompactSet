@@ -3,35 +3,104 @@ package com.example.compactset.codegen.dsl
 import org.objectweb.asm.ClassWriter
 import org.objectweb.asm.Opcodes
 
+/**
+ * The scope of generating a method, contains all of its variables and statements
+ * and offers ways of constructing statements/expressions.
+ */
 class MethodGeneratorScope internal constructor(methodSignature: MethodSignature) : StatementScope(methodSignature) {
-    private var currentSlot = 0
+    private var currentSlot = if (methodSignature.hasThis) 1 else 0
     private val registeredParameters = mutableListOf<LocalVariable>()
-    protected val registeredVariables = mutableListOf<LocalVariable>()
+    private val registeredVariables = mutableListOf<LocalVariable>()
 
+    /**
+     * The list that new statements will be appended to.
+     * This is changed in sub-scopes of if/while blocks.
+     */
     internal var statementTarget: MutableList<Statement> = statements
 
 
-    fun addVariableSlot(type: JVMType): LocalVariable {
+    /**
+     * Declares a variable of the [type] in this method, reserving it a slot and returning it.
+     */
+    private fun addVariableSlot(type: JVMType): LocalVariable {
         val variable = LocalVariable(type, currentSlot)
         currentSlot += type.slotSize
         return variable
     }
 
-    fun declareThis(): LocalVariable {
-        if (!methodSignature.hasThis) {
-            throw IllegalStateException("Cannot call this in non-object method")
-        }
-        return declareParameter(ObjectType(methodSignature.owner))
-    }
-
-    fun declareParameter(type: JVMType): LocalVariable {
+    private fun createLocalVariable(type: JVMType): LocalVariable {
         if (registeredVariables.isNotEmpty()) {
             throw IllegalStateException("Cannot declare a parameter after a variable has been declared")
         }
-        val variable = addVariableSlot(type)
+        return addVariableSlot(type)
+    }
+
+    /**
+     * Declares that this method has a `this` parameter and returns a variable that can be used to load `this`.
+     */
+    fun declareThis(): LocalVariable {
+        if (!methodSignature.hasThis) {
+            throw IllegalStateException("Cannot use `this` in non-object method")
+        }
+
+        return LocalVariable(ObjectType("L${methodSignature.owner};"), 0)
+    }
+
+    /**
+     * Declares a parameter of the function of [type] and returns a variable that can be used to access the parameter.
+     */
+    fun declareParameter(type: JVMType): LocalVariable {
+        if (registeredParameters.size >= methodSignature.parameters.size) {
+            throw IllegalStateException("Attempted to declare parameter that does not exist in method signature")
+        }
+        if (methodSignature.parameters[registeredParameters.size] != type) {
+            throw IllegalStateException("Attempted to declare parameter that does not match type in method signature")
+        }
+
+        val variable = createLocalVariable(type)
         registeredParameters.add(variable)
         return variable
     }
+
+    /**
+     * Declares this method in the [cw] and emits its code.
+     */
+    fun writeMethod(cw: ClassWriter) {
+        if (registeredParameters.size != methodSignature.parameters.size) {
+            throw IllegalStateException("Method signature does not have same amount of parameters as registered in method")
+        }
+        val mv =
+            cw.visitMethod(methodSignature.flags, methodSignature.name, methodSignature.descriptor, null, emptyArray())
+        mv.visitCode()
+
+        emitCode(mv)
+
+        //Automatically add return as last statement in a void function, if it does end in one already.
+        if (methodSignature.returnType == VoidType && statementTarget.lastOrNull() !is ReturnVoidStatement) {
+            mv.visitInsn(Opcodes.RETURN)
+        }
+
+        mv.visitMaxs(0, 0)
+        mv.visitEnd()
+    }
+
+    /**
+     * A function that overrides the current [statementTarget] with the one of the [statementScope]
+     * and runs the [body] of the scope, restoring the original [statementTarget] afterwards.
+     *
+     * This is useful for inner scopes that should contain their own statements rather than this method scope.
+     */
+    fun <T : StatementScope> runWithNewStatementScope(statementScope: T, body: T.() -> Unit) {
+        val old = statementTarget
+        statementTarget = statementScope.statements
+        statementScope.body()
+        statementTarget = old
+    }
+
+    override val topScope: MethodGeneratorScope = this
+
+
+    //region The rest of this class contains the DSL for generating statements/expressions
 
     fun ClassField.load(objectInstance: Expression): Expression {
         return LoadFieldExpression(objectInstance, this)
@@ -65,14 +134,14 @@ class MethodGeneratorScope internal constructor(methodSignature: MethodSignature
     }
 
     fun returnVoid() {
-        if (methodSignature.returnJVMType !is VoidType) {
+        if (methodSignature.returnType !is VoidType) {
             throw IllegalStateException("Cannot return void from non-void method")
         }
         statementTarget.add(ReturnVoidStatement())
     }
 
     fun returnValue(value: Expression) {
-        if (methodSignature.returnJVMType != value.type) {
+        if (methodSignature.returnType != value.type) {
             throw IllegalStateException("Attempting to return incorrect type")
         }
         statementTarget.add(ReturnValueStatement(value))
@@ -114,7 +183,7 @@ class MethodGeneratorScope internal constructor(methodSignature: MethodSignature
     }
 
     fun MethodSignature.call(vararg expressions: Expression): Expression {
-        if (this.returnJVMType is VoidType) {
+        if (this.returnType is VoidType) {
             throw IllegalStateException("Cannot use void function as expression")
         }
         val requiredCount = if (hasThis) parameters.size + 1 else parameters.size
@@ -133,6 +202,9 @@ class MethodGeneratorScope internal constructor(methodSignature: MethodSignature
     }
 
     fun declareVariable(type: JVMType): LocalVariable {
+        if (methodSignature.parameters.size != registeredParameters.size) {
+            throw IllegalStateException("Attempted to declare variable before all parameters were registered.")
+        }
         val variable = addVariableSlot(type)
         registeredVariables.add(variable)
         return variable
@@ -195,48 +267,16 @@ class MethodGeneratorScope internal constructor(methodSignature: MethodSignature
         return ArrayLengthExpression(this)
     }
 
-
-    fun writeMethod(cw: ClassWriter) {
-        val expectedParameters =
-            if (methodSignature.hasThis) methodSignature.parameters.size + 1 else methodSignature.parameters.size
-
-        if (registeredParameters.size != expectedParameters) {
-            throw IllegalStateException("Method signature does not have same amount of parameters as registered in method")
-        }
-        val parametersWithoutThis = if (methodSignature.hasThis) registeredParameters.drop(1) else registeredParameters
-        parametersWithoutThis.zip(methodSignature.parameters) { param, type ->
-            if (param.type != type) {
-                throw IllegalStateException("Registered parameter has different type than signature (${param.type} vs $type)")
-            }
-        }
-        val mv =
-            cw.visitMethod(methodSignature.flags, methodSignature.name, methodSignature.descriptor, null, emptyArray())
-        mv.visitCode()
-
-        emitCode(mv)
-
-        if (methodSignature.returnJVMType == VoidType && statementTarget.lastOrNull() !is ReturnVoidStatement) {
-            mv.visitInsn(Opcodes.RETURN)
-        }
-
-        mv.visitMaxs(0, 0)
-        mv.visitEnd()
-    }
-
-    fun <T : StatementScope> runWithNewStatementScope(statementScope: T, body: T.() -> Unit) {
-        val old = statementTarget
-        statementTarget = statementScope.statements
-        statementScope.body()
-        statementTarget = old
-    }
-
     fun Expression.castToFloat(): Expression {
         return CastToFloatExpression(this)
     }
 
-    override val topScope: MethodGeneratorScope = this
+    //endregion
 }
 
+/**
+ * Generates code for the [methodSignature] in the [ClassWriter] using the DSL defined in [MethodGeneratorScope].
+ */
 fun ClassWriter.generateMethod(
     methodSignature: MethodSignature,
     body: MethodGeneratorScope.() -> Unit

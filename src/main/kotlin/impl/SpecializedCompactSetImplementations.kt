@@ -18,7 +18,7 @@ internal val generatorMap = mapOf<KClass<*>, SpecializedCompactSetGenerator>(
             owner = "java/lang/Integer",
             name = "hashCode",
             parameters = listOf(IntType),
-            returnJVMType = IntType,
+            returnType = IntType,
             flags = Opcodes.ACC_STATIC
         ),
         boxedType = ObjectType("java/lang/Integer"),
@@ -26,7 +26,7 @@ internal val generatorMap = mapOf<KClass<*>, SpecializedCompactSetGenerator>(
             owner = "java/lang/Integer",
             name = "intValue",
             parameters = listOf(),
-            returnJVMType = IntType,
+            returnType = IntType,
             flags = Opcodes.ACC_PUBLIC
         ),
         zeroConstant = 0
@@ -39,7 +39,7 @@ internal val generatorMap = mapOf<KClass<*>, SpecializedCompactSetGenerator>(
             owner = "java/lang/Long",
             name = "hashCode",
             parameters = listOf(LongType),
-            returnJVMType = IntType,
+            returnType = IntType,
             flags = Opcodes.ACC_STATIC
         ),
         boxedType = ObjectType("java/lang/Long"),
@@ -47,7 +47,7 @@ internal val generatorMap = mapOf<KClass<*>, SpecializedCompactSetGenerator>(
             owner = "java/lang/Long",
             name = "longValue",
             parameters = listOf(),
-            returnJVMType = LongType,
+            returnType = LongType,
             flags = Opcodes.ACC_PUBLIC
         ),
         zeroConstant = 0L
@@ -60,7 +60,7 @@ internal val generatorMap = mapOf<KClass<*>, SpecializedCompactSetGenerator>(
             owner = "java/lang/Double",
             name = "hashCode",
             parameters = listOf(DoubleType),
-            returnJVMType = IntType,
+            returnType = IntType,
             flags = Opcodes.ACC_STATIC
         ),
         boxedType = ObjectType("java/lang/Double"),
@@ -68,7 +68,7 @@ internal val generatorMap = mapOf<KClass<*>, SpecializedCompactSetGenerator>(
             owner = "java/lang/Double",
             name = "doubleValue",
             parameters = listOf(),
-            returnJVMType = DoubleType,
+            returnType = DoubleType,
             flags = Opcodes.ACC_PUBLIC
         ),
         zeroConstant = 0.0

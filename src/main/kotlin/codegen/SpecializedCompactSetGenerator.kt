@@ -40,7 +40,7 @@ internal class SpecializedCompactSetGenerator(
         MethodSignature("java/lang/Math", "floorMod", listOf(IntType, IntType), IntType, Opcodes.ACC_STATIC)
 
     private val superConstructor =
-        MethodSignature("java/lang/Object", "<init>", listOf(), VoidType, Opcodes.ACC_PRIVATE)
+        MethodSignature("java/lang/Object", "<init>", listOf(), VoidType, Opcodes.ACC_PUBLIC)
 
     private val constructor =
         MethodSignature(fullyQualifiedClassName, "<init>", listOf(IntType), VoidType, Opcodes.ACC_PUBLIC)
@@ -56,7 +56,7 @@ internal class SpecializedCompactSetGenerator(
         owner = fullyQualifiedClassName,
         name = "getElementIndex",
         parameters = listOf(primitiveArrayType, primitiveType),
-        returnJVMType = IntType,
+        returnType = IntType,
         flags = Opcodes.ACC_PRIVATE
     )
 
@@ -64,7 +64,7 @@ internal class SpecializedCompactSetGenerator(
         owner = fullyQualifiedClassName,
         name = "insertElement",
         parameters = listOf(primitiveArrayType, primitiveType),
-        returnJVMType = BooleanType,
+        returnType = BooleanType,
         flags = Opcodes.ACC_PRIVATE
     )
 
@@ -72,7 +72,7 @@ internal class SpecializedCompactSetGenerator(
         owner = fullyQualifiedClassName,
         name = "rehash",
         parameters = emptyList(),
-        returnJVMType = VoidType,
+        returnType = VoidType,
         flags = Opcodes.ACC_PRIVATE
     )
 
@@ -80,7 +80,7 @@ internal class SpecializedCompactSetGenerator(
         owner = fullyQualifiedClassName,
         name = "contains",
         parameters = listOf(ObjectType("java/lang/Object")),
-        returnJVMType = BooleanType,
+        returnType = BooleanType,
         flags = Opcodes.ACC_PUBLIC
     )
 
@@ -88,7 +88,7 @@ internal class SpecializedCompactSetGenerator(
         owner = fullyQualifiedClassName,
         name = "add",
         parameters = listOf(ObjectType("java/lang/Object")),
-        returnJVMType = BooleanType,
+        returnType = BooleanType,
         flags = Opcodes.ACC_PUBLIC
     )
 

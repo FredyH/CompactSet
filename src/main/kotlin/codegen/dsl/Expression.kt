@@ -4,9 +4,18 @@ import org.objectweb.asm.Label
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
 
+/**
+ * A class representing a code expression that pushes some value onto the JVM stack.
+ */
 abstract class Expression {
+    /**
+     * The type the expression pushes onto the stack
+     */
     abstract val type: JVMType
 
+    /**
+     * Emits the code of this expression to the [mv]
+     */
     abstract fun emitCode(mv: MethodVisitor)
 }
 
@@ -15,20 +24,6 @@ sealed class BinaryExpression(val left: Expression, val right: Expression) : Exp
         if (left.type != right.type) {
             throw IllegalArgumentException("Attempting to compare two types that are not equal")
         }
-    }
-}
-
-class CastObjectExpression(private val sub: Expression, override val type: JVMType) : Expression() {
-    init {
-        if (sub.type is PrimitiveType || type is PrimitiveType) {
-            throw IllegalArgumentException("Cannot do runtime cast of primitive types")
-        }
-    }
-
-    override fun emitCode(mv: MethodVisitor) {
-        sub.emitCode(mv)
-        val name = if (type.typeName.startsWith("L")) type.typeName.drop(1).dropLast(1) else type.typeName
-        mv.visitTypeInsn(Opcodes.CHECKCAST, name)
     }
 }
 
@@ -185,6 +180,20 @@ class ArrayLengthExpression(private val expression: Expression) : Expression() {
     }
 }
 
+class CastObjectExpression(private val sub: Expression, override val type: JVMType) : Expression() {
+    init {
+        if (sub.type is PrimitiveType || type is PrimitiveType) {
+            throw IllegalArgumentException("Cannot do runtime cast of primitive types")
+        }
+    }
+
+    override fun emitCode(mv: MethodVisitor) {
+        sub.emitCode(mv)
+        val name = if (type.typeName.startsWith("L")) type.typeName.drop(1).dropLast(1) else type.typeName
+        mv.visitTypeInsn(Opcodes.CHECKCAST, name)
+    }
+}
+
 class CastToFloatExpression(private val expression: Expression) : Expression() {
     init {
         if (expression.type !is NumericPrimitiveType) {
@@ -295,7 +304,7 @@ class FunctionCallExpression(
     internal val methodSignature: MethodSignature,
     internal val parameters: List<Expression>
 ) : Expression() {
-    override val type: JVMType = methodSignature.returnJVMType
+    override val type: JVMType = methodSignature.returnType
 
     override fun emitCode(mv: MethodVisitor) {
         for (p in parameters) {
@@ -304,7 +313,7 @@ class FunctionCallExpression(
 
         val opcode = if (methodSignature.flags and Opcodes.ACC_STATIC > 0) {
             Opcodes.INVOKESTATIC
-        } else if (methodSignature.flags and Opcodes.ACC_PRIVATE > 0) {
+        } else if (methodSignature.flags and Opcodes.ACC_PRIVATE > 0 || methodSignature.name == "<init>") {
             Opcodes.INVOKESPECIAL
         } else {
             Opcodes.INVOKEVIRTUAL
