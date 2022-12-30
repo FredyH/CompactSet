@@ -28,12 +28,8 @@ internal class DefaultCompactSetImpl<T>(initialSize: Int) : CompactSet<T> {
             return sizeWithoutNull / backingArray.size.toFloat()
         }
 
-    private fun hashIndex(size: Int, element: Any): Int {
-        return Math.floorMod(element.hashCode(), size)
-    }
-
     private fun getElementIndex(array: Array<Any?>, element: Any): Int {
-        var index = hashIndex(array.size, element)
+        var index = Math.floorMod(element.hashCode(), array.size)
 
         var currentValue = array[index]
         while (currentValue != null) {
