@@ -3,6 +3,7 @@ package com.example.compactset.codegen.dsl
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
 import java.lang.IllegalArgumentException
+import kotlin.reflect.KProperty
 
 
 @DslMarker
@@ -96,6 +97,14 @@ abstract class StatementScope(internal val methodSignature: MethodSignature) {
             throw IllegalArgumentException("Cannot use object indexing on non object parameter")
         }
         return ClassAssignmentScope(classField, this, this@StatementScope)
+    }
+
+    private val cachedInitializedVariables = mutableMapOf<KProperty<*>, LocalVariable>()
+
+    fun initializeVar(expr: Expression): LocalVariable {
+        val variable = declareVariable(expr.type)
+        variable `=` expr
+        return variable
     }
 
     class ClassMethodInvocationScope(

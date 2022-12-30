@@ -2,6 +2,7 @@ package com.example.compactset.codegen.dsl
 
 import org.objectweb.asm.ClassWriter
 import org.objectweb.asm.Opcodes
+import java.lang.IllegalArgumentException
 
 /**
  * The scope of generating a method, contains all of its variables and statements
