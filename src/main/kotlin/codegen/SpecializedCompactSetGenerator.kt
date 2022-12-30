@@ -94,12 +94,12 @@ internal class SpecializedCompactSetGenerator(
 
     private fun generateConstructor(cw: ClassWriter) {
         cw.generateMethod(constructor) {
-            val sizeParam = declareParameter(IntType)
+            val initialSize = declareParameter(IntType)
 
             `this`[superConstructor].invokeStatement()
 
-            sizeParam `=` mathMax(sizeParam, 4.asConstant())
-            `this`[backingArray] `=` newArray(primitiveType, sizeParam)
+            initialSize `=` mathMax(initialSize, 4.asConstant())
+            `this`[backingArray] `=` newArray(primitiveType, initialSize)
             `this`[size] `=` 0.asConstant()
         }
     }
@@ -118,35 +118,34 @@ internal class SpecializedCompactSetGenerator(
 
     private fun generateGetElementIndex(cw: ClassWriter) {
         cw.generateMethod(getElementIndex) {
-            val arrayParam = declareParameter(primitiveArrayType)
-            val elementParam = declareParameter(primitiveType)
+            val array = declareParameter(primitiveArrayType)
+            val element = declareParameter(primitiveType)
 
-            val indexVariable =
-                initializeVar(floorMod(primitiveHashCodeFunction(elementParam), arrayParam.arrayLength()))
-            val currentValue = initializeVar(arrayParam[indexVariable])
+            val index = initializeVar(floorMod(primitiveHashCodeFunction(element), array.arrayLength()))
+            val currentValue = initializeVar(array[index])
 
             `while`(currentValue.neq(zeroConstant.asConstant())) {
-                `if`(currentValue.eq(elementParam)) {
-                    `return`(indexVariable)
+                `if`(currentValue.eq(element)) {
+                    `return`(index)
                 }
-                indexVariable `=` (indexVariable + 1.asConstant()) % arrayParam.arrayLength()
-                currentValue `=` arrayParam[indexVariable]
+                index `=` (index + 1.asConstant()) % array.arrayLength()
+                currentValue `=` array[index]
             }
-            `return`(indexVariable)
+            `return`(index)
         }
     }
 
     private fun generateInsertElementMethod(cw: ClassWriter) {
         cw.generateMethod(insertElement) {
-            val arrayParam = declareParameter(primitiveArrayType)
-            val elementParam = declareParameter(primitiveType)
+            val array = declareParameter(primitiveArrayType)
+            val element = declareParameter(primitiveType)
 
-            val indexVariable = initializeVar(`this`[getElementIndex](arrayParam, elementParam))
-            `if`(arrayParam[indexVariable].neq(zeroConstant.asConstant())) {
+            val index = initializeVar(`this`[getElementIndex](array, element))
+            `if`(array[index].neq(zeroConstant.asConstant())) {
                 `return`(false.asConstant())
             }
 
-            arrayParam[indexVariable] = elementParam
+            array[index] = element
             `return`(true.asConstant())
         }
     }
@@ -176,24 +175,24 @@ internal class SpecializedCompactSetGenerator(
 
     private fun generateContainsMethod(cw: ClassWriter) {
         cw.generateMethod(contains) {
-            val boxedParam = declareParameter(ObjectType("java/lang/Object"))
-            val primitiveVar = initializeVar(unboxMethod(boxedParam.objectCast(boxedType)))
+            val boxedValue = declareParameter(ObjectType("java/lang/Object"))
+            val primitiveValue = initializeVar(unboxMethod(boxedValue.objectCast(boxedType)))
 
-            `if`(primitiveVar.eq(zeroConstant.asConstant())) {
+            `if`(primitiveValue.eq(zeroConstant.asConstant())) {
                 `return`(`this`[containsZero])
             }
 
-            val indexParam = initializeVar(`this`[getElementIndex](`this`[backingArray], primitiveVar))
+            val index = initializeVar(`this`[getElementIndex](`this`[backingArray], primitiveValue))
 
-            `return`(`this`[backingArray][indexParam].neq(zeroConstant.asConstant()))
+            `return`(`this`[backingArray][index].neq(zeroConstant.asConstant()))
         }
     }
 
     private fun generateAddMethod(cw: ClassWriter) {
         cw.generateMethod(add) {
-            val boxedParam = declareParameter(ObjectType("java/lang/Object"))
+            val boxedValue = declareParameter(ObjectType("java/lang/Object"))
 
-            val primitiveValue = initializeVar(unboxMethod(boxedParam.objectCast(boxedType)))
+            val primitiveValue = initializeVar(unboxMethod(boxedValue.objectCast(boxedType)))
             `if`(primitiveValue.eq(zeroConstant.asConstant())) {
                 `if`(`this`[containsZero]) {
                     `return`(false.asConstant())
