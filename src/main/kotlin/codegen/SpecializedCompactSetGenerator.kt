@@ -94,142 +94,134 @@ internal class SpecializedCompactSetGenerator(
 
     private fun generateConstructor(cw: ClassWriter) {
         cw.generateMethod(constructor) {
-            val thisParam = declareThis()
             val sizeParam = declareParameter(IntType)
 
-            superConstructor.invokeStatement(thisParam)
+            `this`[superConstructor].invokeStatement()
 
-            sizeParam.assign(mathMax(sizeParam, 4.asConstant()))
-            backingArray.assign(thisParam, newArray(primitiveType, sizeParam))
-            size.assign(thisParam, 0.asConstant())
+            sizeParam `=` mathMax(sizeParam, 4.asConstant())
+            `this`[backingArray] `=` newArray(primitiveType, sizeParam)
+            `this`[size] `=` 0.asConstant()
         }
     }
 
     private fun generateGetLoadFactorMethod(cw: ClassWriter) {
         cw.generateMethod(getLoadFactor) {
-            val thisParam = declareThis()
             val sizeWithoutNull = declareVariable(IntType)
 
-            ifStatement(containsZero.load(thisParam)) {
-                sizeWithoutNull.assign(size.load(thisParam) - 1.asConstant())
-            } elseStatement {
-                sizeWithoutNull.assign(size.load(thisParam))
+            `if`(`this`[containsZero]) {
+                sizeWithoutNull `=` `this`[size] - 1.asConstant()
+            } `else` {
+                sizeWithoutNull `=` `this`[size]
             }
 
-            returnValue(sizeWithoutNull.castToFloat() / backingArray.load(thisParam).arrayLength().castToFloat())
+            `return`(sizeWithoutNull.castToFloat() / `this`[backingArray].arrayLength().castToFloat())
         }
     }
 
     private fun generateGetElementIndex(cw: ClassWriter) {
         cw.generateMethod(getElementIndex) {
-            declareThis()
             val arrayParam = declareParameter(primitiveArrayType)
             val elementParam = declareParameter(primitiveType)
             val indexVariable = declareVariable(IntType)
             val currentValue = declareVariable(primitiveType)
 
-            indexVariable.assign(floorMod(primitiveHashCodeFunction(elementParam), arrayParam.arrayLength()))
-            currentValue.assign(arrayParam[indexVariable])
+            indexVariable `=` floorMod(primitiveHashCodeFunction(elementParam), arrayParam.arrayLength())
+            currentValue `=` arrayParam[indexVariable]
 
-            whileLoop(currentValue.neq(zeroConstant.asConstant())) {
-                ifStatement(currentValue.eq(elementParam)) {
-                    returnValue(indexVariable)
+            `while`(currentValue.neq(zeroConstant.asConstant())) {
+                `if`(currentValue.eq(elementParam)) {
+                    `return`(indexVariable)
                 }
-                indexVariable.assign((indexVariable + 1.asConstant()) % arrayParam.arrayLength())
-                currentValue.assign(arrayParam[indexVariable])
+                indexVariable `=` (indexVariable + 1.asConstant()) % arrayParam.arrayLength()
+                currentValue `=` arrayParam[indexVariable]
             }
-            returnValue(indexVariable)
+            `return`(indexVariable)
         }
     }
 
     private fun generateInsertElementMethod(cw: ClassWriter) {
         cw.generateMethod(insertElement) {
-            val thisParam = declareThis()
             val arrayParam = declareParameter(primitiveArrayType)
             val elementParam = declareParameter(primitiveType)
             val indexVariable = declareVariable(IntType)
 
-            indexVariable.assign(getElementIndex(thisParam, arrayParam, elementParam))
-            ifStatement(arrayParam[indexVariable].neq(zeroConstant.asConstant())) {
-                returnValue(false.asConstant())
+            indexVariable `=` `this`[getElementIndex](arrayParam, elementParam)
+            `if`(arrayParam[indexVariable].neq(zeroConstant.asConstant())) {
+                `return`(false.asConstant())
             }
 
             arrayParam[indexVariable] = elementParam
-            returnValue(true.asConstant())
+            `return`(true.asConstant())
         }
     }
 
 
     private fun generateRehashMethod(cw: ClassWriter) {
         cw.generateMethod(rehash) {
-            val thisParam = declareThis()
             val newArray = declareVariable(primitiveArrayType)
             val currentElem = declareVariable(primitiveType)
 
-            newArray.assign(newArray(primitiveType, backingArray.load(thisParam).arrayLength() * 2.asConstant()))
+            newArray `=` newArray(primitiveType, `this`[backingArray].arrayLength() * 2.asConstant())
 
-            forEachLoop(currentElem, backingArray.load(thisParam)) {
-                ifStatement(currentElem.eq(zeroConstant.asConstant())) {
-                    continueStatement()
+            forEach(currentElem, `this`[backingArray]) {
+                `if`(currentElem.eq(zeroConstant.asConstant())) {
+                    `continue`()
                 }
-                insertElement.invokeStatement(thisParam, newArray, currentElem)
+                `this`[insertElement].invokeStatement(newArray, currentElem)
             }
 
-            backingArray.assign(thisParam, newArray)
+            `this`[backingArray] `=` newArray
         }
     }
 
     private fun generateGetSizeMethod(cw: ClassWriter) {
         cw.generateMethod(getSize) {
-            val thisParam = declareThis()
-            returnValue(size.load(thisParam))
+            `return`(`this`[size])
         }
     }
 
     private fun generateContainsMethod(cw: ClassWriter) {
         cw.generateMethod(contains) {
-            val thisParam = declareThis()
             val boxedParam = declareParameter(ObjectType("java/lang/Object"))
             val primitiveVar = declareVariable(primitiveType)
 
-            primitiveVar.assign(unboxMethod(boxedParam.objectCast(boxedType)))
-            ifStatement(primitiveVar.eq(zeroConstant.asConstant())) {
-                returnValue(containsZero.load(thisParam))
+            primitiveVar `=` unboxMethod(boxedParam.objectCast(boxedType))
+            `if`(primitiveVar.eq(zeroConstant.asConstant())) {
+                `return`(`this`[containsZero])
             }
 
             val indexParam = declareVariable(IntType)
-            indexParam.assign(getElementIndex(thisParam, backingArray.load(thisParam), primitiveVar))
+            indexParam `=` `this`[getElementIndex](`this`[backingArray], primitiveVar)
 
-            returnValue(backingArray.load(thisParam)[indexParam].neq(zeroConstant.asConstant()))
+            `return`(`this`[backingArray][indexParam].neq(zeroConstant.asConstant()))
         }
     }
 
     private fun generateAddMethod(cw: ClassWriter) {
         cw.generateMethod(add) {
-            val thisParam = declareThis()
             val boxedParam = declareParameter(ObjectType("java/lang/Object"))
-            val primitiveVar = declareVariable(primitiveType)
+            val primitiveValue = declareVariable(primitiveType)
 
-            primitiveVar.assign(unboxMethod(boxedParam.objectCast(boxedType)))
-            ifStatement(primitiveVar.eq(zeroConstant.asConstant())) {
-                ifStatement(containsZero.load(thisParam)) {
-                    returnValue(false.asConstant())
+            primitiveValue `=` unboxMethod(boxedParam.objectCast(boxedType))
+            `if`(primitiveValue.eq(zeroConstant.asConstant())) {
+                `if`(`this`[containsZero]) {
+                    `return`(false.asConstant())
                 }
-                containsZero.assign(thisParam, true.asConstant())
-                size.assign(thisParam, size.load(thisParam) + 1.asConstant())
-                returnValue(true.asConstant())
+                `this`[containsZero] `=` true.asConstant()
+                `this`[size] `=` `this`[size] + 1.asConstant()
+                `return`(true.asConstant())
             }
 
-            ifStatement(getLoadFactor(thisParam).gt(0.6f.asConstant())) {
-                rehash.invokeStatement(thisParam)
+            `if`(`this`[getLoadFactor]().gt(0.6f.asConstant())) {
+                `this`[rehash].invokeStatement()
             }
 
-            ifStatement(!insertElement(thisParam, backingArray.load(thisParam), primitiveVar)) {
-                returnValue(false.asConstant())
+            `if`(!`this`[insertElement](`this`[backingArray], primitiveValue)) {
+                `return`(false.asConstant())
             }
-            size.assign(thisParam, size.load(thisParam) + 1.asConstant())
+            `this`[size] `=` `this`[size] + 1.asConstant()
 
-            returnValue(true.asConstant())
+            `return`(true.asConstant())
         }
     }
 

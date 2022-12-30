@@ -2,12 +2,16 @@ package com.example.compactset.codegen.dsl
 
 import org.objectweb.asm.Opcodes
 
+@DslMarker
+annotation class MethodSignatureMarker
+
 /**
  * A class defining the signature of a method of a method in the [owner] class with the [name].
  * The method has to be called with the [parameters] and returns a value of [returnType].
  * The method has the [flags] as access rights, which might make it a private or static function, depending
  * on which it might have an implicit `this` parameter.
  */
+@MethodSignatureMarker
 data class MethodSignature(
     val owner: String,
     val name: String,

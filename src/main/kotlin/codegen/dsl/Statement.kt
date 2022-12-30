@@ -78,32 +78,26 @@ class FunctionCallStatement(private val functionCallExpression: FunctionCallExpr
     }
 }
 
-class IfScope(
-    override val topScope: MethodGeneratorScope,
-    methodSignature: MethodSignature
-) : StatementScope(methodSignature) {
-
-}
+class IfScope(parentScope: StatementScope) : SubScope(parentScope)
 
 class IfStatement(
-    private val parentScope: MethodGeneratorScope,
-    methodSignature: MethodSignature,
+    parentScope: StatementScope,
     private val condition: Expression,
     ifBody: IfScope.() -> Unit
 ) : Statement() {
 
-    private val ifScope: IfScope = IfScope(parentScope, methodSignature)
-    private val elseScope: IfScope = IfScope(parentScope, methodSignature)
+    private val ifScope: IfScope = IfScope(parentScope)
+    private val elseScope: IfScope = IfScope(parentScope)
 
     internal fun setElseBody(elseBody: IfScope.() -> Unit) {
-        parentScope.runWithNewStatementScope(elseScope, elseBody)
+        elseScope.elseBody()
     }
 
     init {
         if (condition.type != BooleanType) {
             throw IllegalStateException("Condition of if statement needs to be of type boolean")
         }
-        parentScope.runWithNewStatementScope(ifScope, ifBody)
+        ifScope.ifBody()
     }
 
     override fun emitCode(mv: MethodVisitor) {
@@ -134,25 +128,16 @@ class BreakStatement(private val endLabel: Label): Statement() {
 }
 
 class LoopScope(
-    override val topScope: MethodGeneratorScope,
-    private val conditionLabel: Label,
-    private val endLabel: Label,
-    methodSignature: MethodSignature
-) : StatementScope(methodSignature) {
-
-    fun continueStatement() {
-        topScope.statementTarget.add(ContinueStatement(conditionLabel))
-    }
-
-    fun breakStatement() {
-        topScope.statementTarget.add(ContinueStatement(endLabel))
-    }
-
+    parentScope: StatementScope,
+    internal val conditionLabel: Label,
+    internal val endLabel: Label
+) : SubScope(parentScope) {
+    override val currentClosestLoop: LoopScope
+        get() = this
 }
 
 class WhileStatement(
-    parentScope: MethodGeneratorScope,
-    methodSignature: MethodSignature,
+    parentScope: StatementScope,
     private val condition: Expression,
     whileBody: LoopScope.() -> Unit
 ) : Statement() {
@@ -160,12 +145,12 @@ class WhileStatement(
     private val conditionLabel = Label()
     private val endLabel = Label()
 
-    private val whileScope = LoopScope(parentScope, conditionLabel, endLabel, methodSignature)
+    private val whileScope = LoopScope(parentScope, conditionLabel, endLabel)
     init {
         if (condition.type != BooleanType) {
             throw IllegalStateException("Condition of if statement needs to be of type boolean")
         }
-        parentScope.runWithNewStatementScope(whileScope, whileBody)
+        whileScope.whileBody()
     }
 
     override fun emitCode(mv: MethodVisitor) {
