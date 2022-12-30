@@ -83,6 +83,7 @@ class MethodGeneratorScope internal constructor(methodSignature: MethodSignature
 /**
  * Generates code for the [methodSignature] in the [ClassWriter] using the DSL defined in [MethodGeneratorScope].
  */
+@StatementScopeMarker
 fun ClassWriter.generateMethod(
     methodSignature: MethodSignature,
     body: MethodGeneratorScope.() -> Unit
